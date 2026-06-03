@@ -1,0 +1,63 @@
+name: Deploy Orchestrator and Frontend to Azure Container Apps
+
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - "**.md"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Log into Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build orchestrator image in ACR
+        run: |
+          az acr build \
+            --registry ${{ secrets.ACR_NAME }} \
+            --image urban-incidents-orchestrator:${{ github.sha }} \
+            --platform linux/amd64 \
+            --source-acr-auth-id "[caller]" \
+            --file orchestrator/Dockerfile \
+            .
+
+      - name: Build frontend image in ACR
+        run: |
+          az acr build \
+            --registry ${{ secrets.ACR_NAME }} \
+            --image urban-incidents-frontend:${{ github.sha }} \
+            --platform linux/amd64 \
+            --source-acr-auth-id "[caller]" \
+            --file frontend/Dockerfile \
+            .
+
+      - name: Prepare Container Apps descriptors
+        run: |
+          cp orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+          cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s/{image-tag}/${{ github.sha }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s|{api-url}|${{ secrets.INCIDENT_API_URL }}|g" /tmp/containerapp-frontend.yaml
+
+      - name: Deploy orchestrator Container App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          yamlConfigPath: /tmp/containerapp-orchestrator.yaml
+          containerAppName: ${{ secrets.ACA_ORCHESTRATOR_NAME }}
+          containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
+          resourceGroup: ${{ secrets.ACA_RG }}
+
+      - name: Deploy frontend Container App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          yamlConfigPath: /tmp/containerapp-frontend.yaml
+          containerAppName: ${{ secrets.ACA_FRONTEND_NAME }}
+          containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
+          resourceGroup: ${{ secrets.ACA_RG }}

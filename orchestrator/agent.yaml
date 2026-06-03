@@ -1,0 +1,26 @@
+kind: hosted
+name: municipal-incident-orchestrator
+description: Coordinates the deployed Intake Agent, Routing Agent, and Notification Agent.
+protocols:
+  - protocol: responses
+    version: 1.0.0
+resources:
+  cpu: "0.5"
+  memory: 1Gi
+environment_variables:
+  - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+    value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+  - name: ENABLE_INSTRUMENTATION
+    value: "true"
+  - name: OTEL_SERVICE_NAME
+    value: municipal-incident-orchestrator
+  - name: OTEL_TRACES_SAMPLER
+    value: always_on
+  - name: ENABLE_SENSITIVE_DATA
+    value: "true"
+  - name: INTAKE_AGENT_NAME
+    value: intake-agent
+  - name: ROUTING_AGENT_NAME
+    value: routing-agent
+  - name: NOTIFICATION_AGENT_NAME
+    value: notification-agent

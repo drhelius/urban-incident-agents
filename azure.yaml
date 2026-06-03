@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+requiredVersions:
+    azd: '>=1.25.3'
+    extensions:
+        azure.ai.agents: '>=0.1.27-preview'
+name: urban-incident-agents
+metadata:
+    template: urban-incident-agents@0.1.0
+services:
+    intake-agent:
+        project: ./agents/intake-agent
+        host: azure.ai.agent
+        language: python
+        docker:
+            path: Dockerfile
+            context: ../..
+            platform: amd64
+        config:
+            container:
+                resources:
+                    cpu: "0.5"
+                    memory: 1Gi
+    municipal-incident-orchestrator:
+        project: ./orchestrator
+        host: azure.ai.agent
+        language: python
+        docker:
+            path: Dockerfile.hosted
+            context: ..
+            platform: amd64
+        config:
+            container:
+                resources:
+                    cpu: "0.5"
+                    memory: 1Gi
+    notification-agent:
+        project: ./agents/notification-agent
+        host: azure.ai.agent
+        language: python
+        docker:
+            path: Dockerfile
+            context: ../..
+            platform: amd64
+        config:
+            container:
+                resources:
+                    cpu: "0.5"
+                    memory: 1Gi
+    routing-agent:
+        project: ./agents/routing-agent
+        host: azure.ai.agent
+        language: python
+        docker:
+            path: Dockerfile
+            context: ../..
+            platform: amd64
+        config:
+            container:
+                resources:
+                    cpu: "0.5"
+                    memory: 1Gi

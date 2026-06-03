@@ -1,0 +1,20 @@
+kind: hosted
+name: routing-agent
+description: Assigns municipal priority, SLA, department, escalation, and work order details.
+protocols:
+  - protocol: responses
+    version: 1.0.0
+resources:
+  cpu: "0.5"
+  memory: 1Gi
+environment_variables:
+  - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+    value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+  - name: ENABLE_INSTRUMENTATION
+    value: "true"
+  - name: OTEL_SERVICE_NAME
+    value: routing-agent
+  - name: OTEL_TRACES_SAMPLER
+    value: always_on
+  - name: ENABLE_SENSITIVE_DATA
+    value: "true"

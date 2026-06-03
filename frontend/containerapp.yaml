@@ -1,0 +1,33 @@
+identity:
+  type: SystemAssigned
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8501
+      transport: auto
+      allowInsecure: false
+    registries:
+      - server: "{acr-name}.azurecr.io"
+        identity: system
+  template:
+    containers:
+      - name: incident-frontend
+        image: "{acr-name}.azurecr.io/urban-incidents-frontend:{image-tag}"
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: INCIDENT_API_URL
+            value: "{api-url}"
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: "{application-insights-connection-string}"
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: '10'

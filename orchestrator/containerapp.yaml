@@ -1,0 +1,43 @@
+identity:
+  type: SystemAssigned
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8000
+      transport: auto
+      allowInsecure: false
+    registries:
+      - server: "{acr-name}.azurecr.io"
+        identity: system
+  template:
+    containers:
+      - name: incident-orchestrator
+        image: "{acr-name}.azurecr.io/urban-incidents-orchestrator:{image-tag}"
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+        env:
+          - name: FOUNDRY_PROJECT_ENDPOINT
+            value: "{foundry-project-endpoint}"
+          - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+            value: "{model-deployment-name}"
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: "{application-insights-connection-string}"
+          - name: ORCHESTRATION_BACKEND
+            value: hosted
+          - name: INTAKE_AGENT_NAME
+            value: intake-agent
+          - name: ROUTING_AGENT_NAME
+            value: routing-agent
+          - name: NOTIFICATION_AGENT_NAME
+            value: notification-agent
+    scale:
+      minReplicas: 1
+      maxReplicas: 3
+      rules:
+        - name: http-rule
+          http:
+            metadata:
+              concurrentRequests: '10'
