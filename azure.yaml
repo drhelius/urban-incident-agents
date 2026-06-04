@@ -21,12 +21,12 @@ services:
                 resources:
                     cpu: "0.5"
                     memory: 1Gi
-    municipal-incident-orchestrator:
-        project: ./agents/orchestrator
+    municipal-incident-notification:
+        project: ./agents/municipal-incident-notification
         host: azure.ai.agent
         language: python
         docker:
-            path: Dockerfile.hosted
+            path: Dockerfile
             context: ../..
             platform: amd64
         config:
@@ -34,12 +34,12 @@ services:
                 resources:
                     cpu: "0.5"
                     memory: 1Gi
-    municipal-incident-notification:
-        project: ./agents/municipal-incident-notification
+    municipal-incident-orchestrator:
+        project: ./agents/orchestrator
         host: azure.ai.agent
         language: python
         docker:
-            path: Dockerfile
+            path: Dockerfile.hosted
             context: ../..
             platform: amd64
         config:

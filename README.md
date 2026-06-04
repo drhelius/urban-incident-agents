@@ -1,188 +1,344 @@
 # Urban Incident Agents
 
-Municipal incident triage and routing built with Python, Microsoft Agent Framework, Microsoft Foundry hosted agents, Streamlit, FastAPI, and Azure Container Apps.
+Municipal incident triage app with a Streamlit frontend, FastAPI API, Microsoft Agent Framework, Microsoft Foundry hosted worker agents, and Azure Container Apps.
 
-## Folder Layout
-
-```text
-frontend/                     Streamlit web form
-agents/
-  orchestrator/               FastAPI bridge plus hosted coordinator agent
-                              WorkflowBuilder orchestration, Dockerfiles, ACA/Foundry config, env example
-  municipal-incident-intake/               Intake Agent prompt, entrypoint, Dockerfile, Foundry config
-  municipal-incident-routing/              Routing Agent prompt, entrypoint, Dockerfile, Foundry config
-  municipal-incident-notification/         Notification Agent prompt, entrypoint, Dockerfile, Foundry config
-docs/                         Optional GitHub Actions deployment template
-AZURE_SETUP.md                Azure infrastructure and deployment setup guide
-```
-
-The root stays intentionally small: project metadata, README, license, and system folders.
-
-## Workflow
-
-```text
-frontend -> orchestrator API or hosted orchestrator agent -> Intake Agent -> Routing Agent -> Notification Agent
-```
-
-Local development uses real Foundry model calls by default. Copy [agents/orchestrator/env.example](agents/orchestrator/env.example) to `.env` and set your own Foundry project values:
-
-- Foundry project endpoint: `https://<YOUR-RESOURCE>.services.ai.azure.com/api/projects/<YOUR-PROJECT>`
-- Model deployment: `gpt-5.4`
-
-The local orchestrator is aligned with the Microsoft Agent Framework agents-in-workflows samples: it builds three `Agent` instances, wraps them with `AgentExecutor(context_mode="last_agent")`, wires them with `WorkflowBuilder`, and can run the full workflow in process for development.
-
-The hosted orchestrator follows the same `WorkflowBuilder` shape, but its nodes are custom `Executor` steps that call `FoundryAgent(...)` references to the separately deployed `municipal-incident-intake`, `municipal-incident-routing`, and `municipal-incident-notification` resources in Foundry. That keeps the three agents separated in the Foundry control plane while still exposing one end-to-end coordinator.
-
-You can run either:
-
-- each independent hosted agent: Intake, Routing, Notification
-- the hosted coordinator workflow: Municipal Incident Orchestrator
-- the FastAPI bridge for the Streamlit frontend
-
-After the three individual agents are deployed as Foundry hosted agents, set `ORCHESTRATION_BACKEND=hosted` so the FastAPI bridge calls the deployed agents. If you deploy the orchestrator as a Foundry hosted agent, clients can invoke that hosted coordinator directly through Foundry; it calls the same three deployed agents by name.
-
-## Observability
-
-Every agent entrypoint and the orchestrator call [agents/orchestrator/observability.py](agents/orchestrator/observability.py), which enables Agent Framework instrumentation. Foundry hosted agents use the platform telemetry exporters that are injected at runtime. Local and Container Apps frontend/API runs export to Application Insights when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.
-
-The hosted-agent manifests set `ENABLE_SENSITIVE_DATA=true` for this demo so Foundry traces can show prompt and response details. Set it to `false` before using real citizen data.
-
-## Local Run Options
+## 1. Install Local Dependencies
 
 ```bash
 cp agents/orchestrator/env.example .env
 az login
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev,api,frontend,observability]"
-```
-
-Install the hosted extra as well when you want to run any `ResponsesHostServer` entrypoint locally:
-
-```bash
 pip install -e ".[dev,api,frontend,hosted,observability]"
 ```
 
-There are four useful ways to run the scenario locally or remotely.
-
-### Option 1: CLI End-to-End Workflow
-
-This is the simplest local end-to-end check. It does not start HTTP servers. The CLI runs the complete `WorkflowBuilder` chain in-process and calls the real Foundry model.
+Set `.env`:
 
 ```bash
-urban-incidents --pretty "Water leak near City Hospital is flooding the road"
-```
-
-Use this when you want to verify the agent flow quickly.
-
-### Option 2: Frontend -> FastAPI -> In-Process Workflow
-
-This is the normal local web-app path. The frontend calls FastAPI on port `8000`. FastAPI runs the orchestrator workflow in-process.
-
-Set:
-
-```bash
+FOUNDRY_PROJECT_ENDPOINT=https://<foundry-account-name>.services.ai.azure.com/api/projects/<foundry-project-name>
+AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5.4
 ORCHESTRATION_BACKEND=local
-```
-
-Start the API:
-
-```bash
-uvicorn orchestrator.api:app --reload --host 0.0.0.0 --port 8000
-```
-
-Start the frontend in another terminal:
-
-```bash
-INCIDENT_API_URL=http://localhost:8000 streamlit run frontend/app.py --server.port 8501
-```
-
-Open `http://localhost:8501`.
-
-### Option 3: Frontend -> FastAPI -> Local ResponsesHostServer
-
-This uses two local orchestrator processes and the three deployed Foundry hosted agents:
-
-- [agents/orchestrator/main.py](agents/orchestrator/main.py) runs the hosted-agent-compatible Responses server on port `8088` and coordinates deployed hosted agents.
-- FastAPI runs on port `8000` and proxies incident requests to that local Responses endpoint.
-
-Start the local hosted-agent-compatible orchestrator server:
-
-```bash
-python -m orchestrator.main
-```
-
-It exposes the Responses protocol on `http://localhost:8088/responses`.
-
-In another terminal, start the FastAPI bridge with:
-
-```bash
-ORCHESTRATION_BACKEND=local_responses \
-LOCAL_ORCHESTRATOR_RESPONSES_URL=http://localhost:8088/responses \
-uvicorn orchestrator.api:app --reload --host 0.0.0.0 --port 8000
-```
-
-Then start the frontend:
-
-```bash
-INCIDENT_API_URL=http://localhost:8000 streamlit run frontend/app.py --server.port 8501
-```
-
-Use this when you want the local web app to exercise the same Responses protocol shape used by Foundry Hosted Agents while still keeping Intake, Routing, and Notification as separate Foundry resources.
-
-### Option 4: Frontend -> FastAPI -> Deployed Foundry Hosted Agents
-
-This is the distributed hosted-agent path. FastAPI calls deployed Foundry hosted agents by name through the Foundry project endpoint.
-
-Set:
-
-```bash
-ORCHESTRATION_BACKEND=hosted
+APPLICATIONINSIGHTS_CONNECTION_STRING=<foundry-app-insights-connection-string>
 INTAKE_AGENT_NAME=municipal-incident-intake
 ROUTING_AGENT_NAME=municipal-incident-routing
 NOTIFICATION_AGENT_NAME=municipal-incident-notification
 ```
 
-Then run the API and frontend as in Option 2.
-
-Use this after the three independent hosted agents are deployed to Foundry.
-
-### Direct Hosted Orchestrator Invocation
-
-The orchestrator itself can also be deployed or run as a Foundry hosted coordinator agent. In that case, clients can call its Responses endpoint directly and do not need the FastAPI bridge unless they want the Streamlit web UI or the `/api/incidents` API shape. The deployed orchestrator expects the three independent hosted agents to exist in the same Foundry project.
-
-## Hosted Agent Entry Points
-
-Each hosted agent has its own code folder:
-
-- [agents/municipal-incident-intake](agents/municipal-incident-intake)
-- [agents/municipal-incident-routing](agents/municipal-incident-routing)
-- [agents/municipal-incident-notification](agents/municipal-incident-notification)
-- [agents/orchestrator](agents/orchestrator)
-
-Each agent folder owns its prompt, `main.py`, `Dockerfile`, `requirements.txt`, and `agent.yaml`.
-The orchestrator owns the same hosted-agent assets plus `Dockerfile.hosted` for Foundry hosted-agent deployment and `Dockerfile` for the FastAPI bridge. Its hosted entrypoint coordinates deployed agents; the CLI and local API mode still support an in-process workflow for development.
-
-## API
+## 2. Run Local CLI
 
 ```bash
-curl -sS -X POST http://localhost:8000/api/incidents \
-  -H "Content-Type: application/json" \
-  -d '{"report":"Broken streetlight near Pine Street school crossing and it is very dark at night"}'
+ORCHESTRATION_BACKEND=local \
+urban-incidents --pretty "Water leak near City Hospital is flooding the road"
 ```
 
-The response has this shape:
+## 3. Run Local API And Frontend
 
-```json
-{
-  "status": "accepted",
-  "correlation_id": "inc-...",
-  "intake": {},
-  "routing": {},
-  "notification": {}
-}
+Terminal 1:
+
+```bash
+ORCHESTRATION_BACKEND=local \
+uvicorn orchestrator.api:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Deployment
+Terminal 2:
 
-See [AZURE_SETUP.md](AZURE_SETUP.md) for Azure CLI commands covering ACR, Foundry hosted agents, ACA, identities, and RBAC.
+```bash
+INCIDENT_API_URL=http://localhost:8000 \
+streamlit run frontend/app.py --server.port 8501
+```
+
+Open:
+
+```text
+http://localhost:8501
+```
+
+## 4. Set Azure Variables
+
+```bash
+LOCATION="<azure-region>"
+APP_RG="<resource-group>"
+
+ACR_NAME="<acr-name>"
+ACA_ENV_NAME="<container-apps-env-name>"
+ACA_ORCHESTRATOR_NAME="<orchestrator-container-app-name>"
+ACA_FRONTEND_NAME="<frontend-container-app-name>"
+
+FOUNDRY_ACCOUNT_NAME="<foundry-account-name>"
+FOUNDRY_PROJECT_NAME="<foundry-project-name>"
+FOUNDRY_PROJECT_ENDPOINT="https://<foundry-account-name>.services.ai.azure.com/api/projects/<foundry-project-name>"
+FOUNDRY_PROJECT_ID=$(az resource list \
+  --resource-type Microsoft.CognitiveServices/accounts/projects \
+  --query "[?name=='$FOUNDRY_ACCOUNT_NAME/$FOUNDRY_PROJECT_NAME'].id | [0]" \
+  -o tsv)
+AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-5.4"
+
+APP_INSIGHTS_NAME="<foundry-connected-app-insights-name>"
+APP_INSIGHTS_RG="$APP_RG"
+
+IMAGE_TAG=$(date +%Y%m%d%H%M%S)
+```
+
+## 5. Prepare Azure CLI
+
+```bash
+az login
+az upgrade
+az extension add --name containerapp --upgrade --allow-preview true
+az extension add --name application-insights --upgrade
+
+azd auth login
+azd ext install azure.ai.agents
+
+az provider register --namespace Microsoft.App
+az provider register --namespace Microsoft.OperationalInsights
+az provider register --namespace Microsoft.ContainerRegistry
+```
+
+## 6. Create Azure Resources
+
+```bash
+az group create \
+  --name "$APP_RG" \
+  --location "$LOCATION"
+
+az acr create \
+  --resource-group "$APP_RG" \
+  --name "$ACR_NAME" \
+  --sku Standard \
+  --location "$LOCATION" \
+  --role-assignment-mode rbac-abac
+
+az containerapp env create \
+  --name "$ACA_ENV_NAME" \
+  --resource-group "$APP_RG" \
+  --location "$LOCATION" \
+  --logs-destination none
+
+ACR_ID=$(az acr show --name "$ACR_NAME" --resource-group "$APP_RG" --query id -o tsv)
+ACR_LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --resource-group "$APP_RG" --query loginServer -o tsv)
+
+APPLICATIONINSIGHTS_CONNECTION_STRING=$(az monitor app-insights component show \
+  --app "$APP_INSIGHTS_NAME" \
+  --resource-group "$APP_INSIGHTS_RG" \
+  --query connectionString \
+  -o tsv)
+```
+
+## 7. Grant ACR Build Access
+
+```bash
+CALLER_OBJECT_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null)
+
+if [ -z "$CALLER_OBJECT_ID" ]; then
+  CALLER_OBJECT_ID=$(az account show --query user.name -o tsv)
+fi
+
+for ROLE in \
+  "Container Registry Repository Writer" \
+  "Container Registry Repository Reader" \
+  "Container Registry Repository Catalog Lister"; do
+  az role assignment create \
+    --assignee "$CALLER_OBJECT_ID" \
+    --role "$ROLE" \
+    --scope "$ACR_ID"
+done
+```
+
+## 8. Configure azd
+
+```bash
+azd env new <azd-environment-name>
+
+azd env set AZURE_TENANT_ID "$(az account show --query tenantId -o tsv)"
+azd env set AZURE_SUBSCRIPTION_ID "$(az account show --query id -o tsv)"
+azd env set AZURE_LOCATION "$LOCATION"
+azd env set AZURE_AI_PROJECT_ID "$FOUNDRY_PROJECT_ID"
+azd env set AZURE_AI_PROJECT_ENDPOINT "$FOUNDRY_PROJECT_ENDPOINT"
+azd env set FOUNDRY_PROJECT_ENDPOINT "$FOUNDRY_PROJECT_ENDPOINT"
+azd env set AZURE_AI_MODEL_DEPLOYMENT_NAME "$AZURE_AI_MODEL_DEPLOYMENT_NAME"
+azd env set AZURE_CONTAINER_REGISTRY_NAME "$ACR_NAME"
+azd env set AZURE_CONTAINER_REGISTRY_ENDPOINT "$ACR_LOGIN_SERVER"
+azd env set IMAGE_TAG "$IMAGE_TAG"
+```
+
+## 9. Grant Foundry ACR Pull Access
+
+```bash
+FOUNDRY_PROJECT_PRINCIPAL_ID=$(az resource show \
+  --ids "$FOUNDRY_PROJECT_ID" \
+  --query identity.principalId -o tsv)
+
+for ROLE in \
+  "Container Registry Repository Reader" \
+  "Container Registry Repository Catalog Lister"; do
+  az role assignment create \
+    --assignee "$FOUNDRY_PROJECT_PRINCIPAL_ID" \
+    --role "$ROLE" \
+    --scope "$ACR_ID"
+done
+```
+
+## 10. Deploy Foundry Worker Agents
+
+```bash
+azd deploy municipal-incident-intake
+azd deploy municipal-incident-routing
+azd deploy municipal-incident-notification
+```
+
+## 11. Verify Foundry Worker Agents
+
+```bash
+azd ai agent invoke municipal-incident-intake "Water leak near City Hospital is flooding the road"
+azd ai agent invoke municipal-incident-routing "<paste Intake Agent JSON here>"
+azd ai agent invoke municipal-incident-notification "<paste Routing Agent envelope JSON here>"
+```
+
+## 12. Build ACA Images
+
+```bash
+az acr build \
+  --registry "$ACR_NAME" \
+  --image urban-incidents-orchestrator:$IMAGE_TAG \
+  --platform linux/amd64 \
+  --source-acr-auth-id "[caller]" \
+  --file agents/orchestrator/Dockerfile \
+  .
+
+az acr build \
+  --registry "$ACR_NAME" \
+  --image urban-incidents-frontend:$IMAGE_TAG \
+  --platform linux/amd64 \
+  --source-acr-auth-id "[caller]" \
+  --file frontend/Dockerfile \
+  .
+```
+
+## 13. Create ACA Apps
+
+```bash
+az containerapp create \
+  --name "$ACA_ORCHESTRATOR_NAME" \
+  --resource-group "$APP_RG" \
+  --environment "$ACA_ENV_NAME" \
+  --image mcr.microsoft.com/k8se/quickstart:latest \
+  --target-port 80 \
+  --ingress external \
+  --system-assigned
+
+az containerapp create \
+  --name "$ACA_FRONTEND_NAME" \
+  --resource-group "$APP_RG" \
+  --environment "$ACA_ENV_NAME" \
+  --image mcr.microsoft.com/k8se/quickstart:latest \
+  --target-port 80 \
+  --ingress external \
+  --system-assigned
+```
+
+## 14. Grant ACA ACR Pull Access
+
+```bash
+ACA_ORCHESTRATOR_PRINCIPAL_ID=$(az containerapp identity show \
+  --name "$ACA_ORCHESTRATOR_NAME" \
+  --resource-group "$APP_RG" \
+  --query principalId -o tsv)
+
+ACA_FRONTEND_PRINCIPAL_ID=$(az containerapp identity show \
+  --name "$ACA_FRONTEND_NAME" \
+  --resource-group "$APP_RG" \
+  --query principalId -o tsv)
+
+for PRINCIPAL_ID in "$ACA_ORCHESTRATOR_PRINCIPAL_ID" "$ACA_FRONTEND_PRINCIPAL_ID"; do
+  az role assignment create \
+    --assignee "$PRINCIPAL_ID" \
+    --role "Container Registry Repository Reader" \
+    --scope "$ACR_ID"
+
+  az role assignment create \
+    --assignee "$PRINCIPAL_ID" \
+    --role "Container Registry Repository Catalog Lister" \
+    --scope "$ACR_ID"
+done
+
+az containerapp registry set \
+  --name "$ACA_ORCHESTRATOR_NAME" \
+  --resource-group "$APP_RG" \
+  --server "$ACR_LOGIN_SERVER" \
+  --identity system
+
+az containerapp registry set \
+  --name "$ACA_FRONTEND_NAME" \
+  --resource-group "$APP_RG" \
+  --server "$ACR_LOGIN_SERVER" \
+  --identity system
+```
+
+## 15. Grant ACA Foundry Access
+
+```bash
+FOUNDRY_ACCOUNT_ID=$(az cognitiveservices account show \
+  --name "$FOUNDRY_ACCOUNT_NAME" \
+  --resource-group "$APP_RG" \
+  --query id -o tsv)
+
+az role assignment create \
+  --assignee "$ACA_ORCHESTRATOR_PRINCIPAL_ID" \
+  --role "Foundry User" \
+  --scope "$FOUNDRY_ACCOUNT_ID"
+```
+
+## 16. Deploy ACA API
+
+```bash
+cp agents/orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+
+sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-orchestrator.yaml
+sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-orchestrator.yaml
+sed -i "s|{foundry-project-endpoint}|$FOUNDRY_PROJECT_ENDPOINT|g" /tmp/containerapp-orchestrator.yaml
+sed -i "s|{model-deployment-name}|$AZURE_AI_MODEL_DEPLOYMENT_NAME|g" /tmp/containerapp-orchestrator.yaml
+sed -i "s|{application-insights-connection-string}|$APPLICATIONINSIGHTS_CONNECTION_STRING|g" /tmp/containerapp-orchestrator.yaml
+
+az containerapp update \
+  --name "$ACA_ORCHESTRATOR_NAME" \
+  --resource-group "$APP_RG" \
+  --yaml /tmp/containerapp-orchestrator.yaml
+
+ORCHESTRATOR_FQDN=$(az containerapp show \
+  --name "$ACA_ORCHESTRATOR_NAME" \
+  --resource-group "$APP_RG" \
+  --query properties.configuration.ingress.fqdn -o tsv)
+
+ORCHESTRATOR_URL="https://$ORCHESTRATOR_FQDN"
+```
+
+## 17. Deploy ACA Frontend
+
+```bash
+cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
+
+sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-frontend.yaml
+sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-frontend.yaml
+sed -i "s|{api-url}|$ORCHESTRATOR_URL|g" /tmp/containerapp-frontend.yaml
+sed -i "s|{application-insights-connection-string}|$APPLICATIONINSIGHTS_CONNECTION_STRING|g" /tmp/containerapp-frontend.yaml
+
+az containerapp update \
+  --name "$ACA_FRONTEND_NAME" \
+  --resource-group "$APP_RG" \
+  --yaml /tmp/containerapp-frontend.yaml
+```
+
+## 18. Verify ACA
+
+```bash
+FRONTEND_FQDN=$(az containerapp show \
+  --name "$ACA_FRONTEND_NAME" \
+  --resource-group "$APP_RG" \
+  --query properties.configuration.ingress.fqdn -o tsv)
+
+echo "Frontend: https://$FRONTEND_FQDN"
+echo "API health: $ORCHESTRATOR_URL/health"
+
+curl -sS "$ORCHESTRATOR_URL/health"
+```

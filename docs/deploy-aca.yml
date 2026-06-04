@@ -44,6 +44,9 @@ jobs:
           cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
           sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
           sed -i "s/{image-tag}/${{ github.sha }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s|{foundry-project-endpoint}|${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}|g" /tmp/containerapp-orchestrator.yaml
+          sed -i "s|{model-deployment-name}|${{ secrets.AZURE_AI_MODEL_DEPLOYMENT_NAME }}|g" /tmp/containerapp-orchestrator.yaml
+          sed -i "s|{application-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
           sed -i "s|{api-url}|${{ secrets.INCIDENT_API_URL }}|g" /tmp/containerapp-frontend.yaml
 
       - name: Deploy orchestrator Container App

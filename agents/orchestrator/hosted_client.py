@@ -37,7 +37,7 @@ class HostedAgentResponsesClient:
                 "Content-Type": "application/json",
             }
         )
-        payload = {"input": prompt, "stream": False}
+        payload = {"input": prompt, "stream": False, "store": False}
         timeout = httpx.Timeout(self.settings.request_timeout_seconds)
         with trace_span(
             "orchestrator.call_hosted_agent",
@@ -142,6 +142,9 @@ def _responses_endpoint(project_endpoint: str, agent_name: str) -> str:
 
 
 def _responses_text(payload: dict[str, Any]) -> str:
+    if payload.get("status") == "failed":
+        raise RuntimeError(f"Hosted agent response failed: {payload.get('error') or payload}")
+
     output_text = payload.get("output_text")
     if isinstance(output_text, str) and output_text.strip():
         return output_text

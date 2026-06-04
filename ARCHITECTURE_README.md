@@ -23,7 +23,7 @@ The orchestrator is the system boundary for the complete workflow. It has two ro
 
 The local orchestrator is aligned with the Microsoft Agent Framework agents-in-workflows samples. It can build three Agent Framework agents, wrap them with `AgentExecutor` using last-agent context, and wire them with `WorkflowBuilder` for local development.
 
-The hosted orchestrator uses the same workflow shape, but each workflow node is a custom `Executor` that calls a `FoundryAgent` reference to an already deployed hosted agent. That means Intake, Routing, and Notification remain separate Foundry control-plane resources with their own versions, traces, metrics, and cost attribution.
+The deployed application path uses the FastAPI bridge to call already deployed hosted worker agents directly. That means Intake, Routing, and Notification remain separate Foundry control-plane resources with their own versions, traces, metrics, and cost attribution.
 
 This means the full flow can be run as one deployable orchestrator agent, while the individual agents can also be deployed and invoked independently.
 
@@ -104,13 +104,13 @@ This mode allows each agent to be invoked, scaled, tested, observed, and version
 
 ### Hosted Coordinator Agent
 
-The orchestrator can also be deployed as a Foundry Hosted Agent. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification hosted agents in sequence through Agent Framework workflow composition.
+The orchestrator can also be deployed as a Foundry Hosted Agent for hosted-coordinator experiments. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification hosted agents in sequence through Agent Framework workflow composition.
 
-This mode combines the official workflow executor pattern with the official `FoundryAgent` pattern for connecting to existing deployed Foundry agents.
+This mode is optional and is not required for the supported ACA frontend/API deployment path.
 
 ### Frontend and API on Azure Container Apps
 
-The Streamlit frontend and FastAPI bridge can be deployed to Azure Container Apps. The FastAPI bridge can either run the workflow itself or call deployed hosted agents, depending on configuration.
+The Streamlit frontend and FastAPI bridge can be deployed to Azure Container Apps. The FastAPI bridge can either run the workflow itself or call the three deployed worker hosted agents, depending on configuration.
 
 ## Foundry Integration
 
@@ -138,7 +138,7 @@ Each agent entrypoint and the orchestrator configure OpenTelemetry instrumentati
 
 The code emits agent creation spans with generative AI semantic attributes so Foundry Control Plane can correlate traces with registered or hosted agents.
 
-The frontend, FastAPI bridge, local Responses server path, and deployed hosted-agent client path use W3C trace-context propagation. The frontend injects trace headers into API calls, and the API injects trace headers into local or deployed Responses calls. For a complete end-to-end trace, every component should export to the same Application Insights resource, and each network hop must preserve the `traceparent` context.
+The frontend, FastAPI bridge, and deployed hosted-agent client path use W3C trace-context propagation. The frontend injects trace headers into API calls, and the API injects trace headers into deployed Responses calls. For a complete end-to-end trace, every component should export to the same Application Insights resource, and each network hop must preserve the `traceparent` context.
 
 The observability goals are:
 
@@ -157,7 +157,7 @@ Each deployable owns its own runtime and deployment assets:
 - `agents/municipal-incident-intake/` owns the Intake Agent prompt, entrypoint, container, requirements, and Foundry metadata.
 - `agents/municipal-incident-routing/` owns the Routing Agent prompt, entrypoint, container, requirements, and Foundry metadata.
 - `agents/municipal-incident-notification/` owns the Notification Agent prompt, entrypoint, container, requirements, and Foundry metadata.
-- `AZURE_SETUP.md` owns Azure infrastructure and deployment setup guidance.
+- `README.md` owns Azure infrastructure and deployment setup guidance.
 - `docs/` owns reusable operational templates such as the optional GitHub Actions workflow.
 
 This keeps deployable concerns close to the system that owns them and avoids a central mixed deployment-assets folder.
