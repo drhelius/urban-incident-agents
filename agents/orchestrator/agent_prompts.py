@@ -7,7 +7,7 @@ from types import ModuleType
 
 from orchestrator.models import IntakeResult, RoutingResult
 
-AGENTS_ROOT = Path(__file__).resolve().parent.parent / "agents"
+AGENTS_ROOT = Path(__file__).resolve().parent.parent
 
 
 @lru_cache(maxsize=3)
@@ -23,26 +23,30 @@ def _load_prompt_module(agent_folder: str) -> ModuleType:
 
 
 def intake_agent_instructions() -> str:
-    return str(_load_prompt_module("intake-agent").INTAKE_AGENT_INSTRUCTIONS)
+    return str(_load_prompt_module("municipal-incident-intake").INTAKE_AGENT_INSTRUCTIONS)
 
 
 def routing_agent_instructions() -> str:
-    return str(_load_prompt_module("routing-agent").ROUTING_AGENT_INSTRUCTIONS)
+    return str(_load_prompt_module("municipal-incident-routing").ROUTING_AGENT_INSTRUCTIONS)
 
 
 def notification_agent_instructions() -> str:
-    return str(_load_prompt_module("notification-agent").NOTIFICATION_AGENT_INSTRUCTIONS)
+    return str(
+        _load_prompt_module("municipal-incident-notification").NOTIFICATION_AGENT_INSTRUCTIONS
+    )
 
 
 def build_intake_prompt(report: str) -> str:
-    return str(_load_prompt_module("intake-agent").build_intake_prompt(report))
+    return str(_load_prompt_module("municipal-incident-intake").build_intake_prompt(report))
 
 
 def build_routing_prompt(report: str, intake: IntakeResult) -> str:
-    return str(_load_prompt_module("routing-agent").build_routing_prompt(report, intake))
+    return str(_load_prompt_module("municipal-incident-routing").build_routing_prompt(report, intake))
 
 
 def build_notification_prompt(report: str, intake: IntakeResult, routing: RoutingResult) -> str:
     return str(
-        _load_prompt_module("notification-agent").build_notification_prompt(report, intake, routing)
+        _load_prompt_module("municipal-incident-notification").build_notification_prompt(
+            report, intake, routing
+        )
     )

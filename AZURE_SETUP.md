@@ -113,10 +113,10 @@ The repository includes a root [azure.yaml](azure.yaml) with four `azure.ai.agen
 
 | azd service | Folder | Agent |
 | --- | --- | --- |
-| `municipal-incident-orchestrator` | `orchestrator/` | Hosted coordinator workflow |
-| `intake-agent` | `agents/intake-agent/` | Intake Agent |
-| `routing-agent` | `agents/routing-agent/` | Routing Agent |
-| `notification-agent` | `agents/notification-agent/` | Notification Agent |
+| `municipal-incident-orchestrator` | `agents/orchestrator/` | Hosted coordinator workflow |
+| `municipal-incident-intake` | `agents/municipal-incident-intake/` | Intake Agent |
+| `municipal-incident-routing` | `agents/municipal-incident-routing/` | Routing Agent |
+| `municipal-incident-notification` | `agents/municipal-incident-notification/` | Notification Agent |
 
 Each service folder contains an `agent.yaml` that uses the current `azd` hosted-agent schema: top-level `kind: hosted`, `name`, `protocols`, `resources`, and `environment_variables`.
 
@@ -170,9 +170,9 @@ If `azd deploy` still reports image pull authorization errors immediately after 
 
 Deploy these four hosted-agent services from [azure.yaml](azure.yaml). Deploy the three worker agents before the orchestrator because the hosted orchestrator calls them by Foundry agent name.
 
-- `intake-agent`
-- `routing-agent`
-- `notification-agent`
+- `municipal-incident-intake`
+- `municipal-incident-routing`
+- `municipal-incident-notification`
 - `municipal-incident-orchestrator`
 
 The azd extension reads each service folder's `agent.yaml`, builds the configured Dockerfile, pushes the image to ACR, and creates a Foundry hosted-agent version. The exact pushed image name is managed by azd and printed in the deploy output.
@@ -180,16 +180,16 @@ The azd extension reads each service folder's `agent.yaml`, builds the configure
 Deploy all hosted-agent services:
 
 ```bash
-azd deploy intake-agent
-azd deploy routing-agent
-azd deploy notification-agent
+azd deploy municipal-incident-intake
+azd deploy municipal-incident-routing
+azd deploy municipal-incident-notification
 azd deploy municipal-incident-orchestrator
 ```
 
 Or deploy one service while iterating:
 
 ```bash
-azd deploy intake-agent
+azd deploy municipal-incident-intake
 ```
 
 `azd deploy` builds the container image, pushes it to ACR, creates a hosted-agent version in Foundry Agent Service, waits for provisioning, and prints the hosted-agent playground/endpoint details.
@@ -209,9 +209,9 @@ If `azd deploy` reports ACR pull or role-assignment failures, verify that your a
 After each version is active, invoke it with azd. Check the worker agents first:
 
 ```bash
-azd ai agent invoke intake-agent "Water leak near City Hospital is flooding the road"
-azd ai agent invoke routing-agent "<paste Intake Agent JSON here>"
-azd ai agent invoke notification-agent "<paste Routing Agent envelope JSON here>"
+azd ai agent invoke municipal-incident-intake "Water leak near City Hospital is flooding the road"
+azd ai agent invoke municipal-incident-routing "<paste Intake Agent JSON here>"
+azd ai agent invoke municipal-incident-notification "<paste Routing Agent envelope JSON here>"
 ```
 
 Then invoke the full coordinator workflow:
@@ -233,7 +233,7 @@ The Streamlit frontend, FastAPI bridge, local Responses server path, deployed ho
 To see one connected trace in Foundry/Application Insights, use the same Application Insights resource for every component:
 
 - Foundry Hosted Agents receive `APPLICATIONINSIGHTS_CONNECTION_STRING` automatically from the platform.
-- The FastAPI Container App receives it through `orchestrator/containerapp.yaml`.
+- The FastAPI Container App receives it through `agents/orchestrator/containerapp.yaml`.
 - The Streamlit frontend receives it through `frontend/containerapp.yaml`.
 
 The hosted-agent manifests also set:
@@ -255,7 +255,7 @@ Foundry can show a complete span tree when all components export to the same App
 
 These images are for Azure Container Apps:
 
-- FastAPI bridge: `orchestrator/Dockerfile`
+- FastAPI bridge: `agents/orchestrator/Dockerfile`
 - Streamlit frontend: `frontend/Dockerfile`
 
 ```bash
@@ -264,7 +264,7 @@ az acr build \
   --image urban-incidents-orchestrator:$IMAGE_TAG \
   --platform linux/amd64 \
   --source-acr-auth-id "[caller]" \
-  --file orchestrator/Dockerfile \
+  --file agents/orchestrator/Dockerfile \
   .
 
 az acr build \
@@ -369,7 +369,7 @@ If the Foundry account is not in `$APP_RG`, set the correct resource group befor
 Prepare and apply the orchestrator Container App descriptor:
 
 ```bash
-cp orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+cp agents/orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
 
 sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-orchestrator.yaml
 sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-orchestrator.yaml

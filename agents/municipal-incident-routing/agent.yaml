@@ -1,6 +1,6 @@
 kind: hosted
-name: notification-agent
-description: Generates a friendly citizen-facing notification from intake and routing results.
+name: municipal-incident-routing
+description: Assigns municipal priority, SLA, department, escalation, and work order details.
 protocols:
   - protocol: responses
     version: 1.0.0
@@ -13,7 +13,7 @@ environment_variables:
   - name: ENABLE_INSTRUMENTATION
     value: "true"
   - name: OTEL_SERVICE_NAME
-    value: notification-agent
+    value: municipal-incident-routing
   - name: OTEL_TRACES_SAMPLER
     value: always_on
   - name: ENABLE_SENSITIVE_DATA

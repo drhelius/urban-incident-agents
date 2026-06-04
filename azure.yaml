@@ -8,8 +8,8 @@ name: urban-incident-agents
 metadata:
     template: urban-incident-agents@0.1.0
 services:
-    intake-agent:
-        project: ./agents/intake-agent
+    municipal-incident-intake:
+        project: ./agents/municipal-incident-intake
         host: azure.ai.agent
         language: python
         docker:
@@ -22,20 +22,20 @@ services:
                     cpu: "0.5"
                     memory: 1Gi
     municipal-incident-orchestrator:
-        project: ./orchestrator
+        project: ./agents/orchestrator
         host: azure.ai.agent
         language: python
         docker:
             path: Dockerfile.hosted
-            context: ..
+            context: ../..
             platform: amd64
         config:
             container:
                 resources:
                     cpu: "0.5"
                     memory: 1Gi
-    notification-agent:
-        project: ./agents/notification-agent
+    municipal-incident-notification:
+        project: ./agents/municipal-incident-notification
         host: azure.ai.agent
         language: python
         docker:
@@ -47,8 +47,8 @@ services:
                 resources:
                     cpu: "0.5"
                     memory: 1Gi
-    routing-agent:
-        project: ./agents/routing-agent
+    municipal-incident-routing:
+        project: ./agents/municipal-incident-routing
         host: azure.ai.agent
         language: python
         docker:

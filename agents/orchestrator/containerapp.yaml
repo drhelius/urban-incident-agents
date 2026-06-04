@@ -28,11 +28,11 @@ properties:
           - name: ORCHESTRATION_BACKEND
             value: hosted
           - name: INTAKE_AGENT_NAME
-            value: intake-agent
+            value: municipal-incident-intake
           - name: ROUTING_AGENT_NAME
-            value: routing-agent
+            value: municipal-incident-routing
           - name: NOTIFICATION_AGENT_NAME
-            value: notification-agent
+            value: municipal-incident-notification
     scale:
       minReplicas: 1
       maxReplicas: 3

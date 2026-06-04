@@ -6,12 +6,12 @@ Municipal incident triage and routing built with Python, Microsoft Agent Framewo
 
 ```text
 frontend/                     Streamlit web form
-orchestrator/                 FastAPI bridge plus hosted coordinator agent
-                              WorkflowBuilder orchestration, Dockerfiles, ACA/Foundry config, env example
 agents/
-  intake-agent/               Intake Agent prompt, entrypoint, Dockerfile, Foundry config
-  routing-agent/              Routing Agent prompt, entrypoint, Dockerfile, Foundry config
-  notification-agent/         Notification Agent prompt, entrypoint, Dockerfile, Foundry config
+  orchestrator/               FastAPI bridge plus hosted coordinator agent
+                              WorkflowBuilder orchestration, Dockerfiles, ACA/Foundry config, env example
+  municipal-incident-intake/               Intake Agent prompt, entrypoint, Dockerfile, Foundry config
+  municipal-incident-routing/              Routing Agent prompt, entrypoint, Dockerfile, Foundry config
+  municipal-incident-notification/         Notification Agent prompt, entrypoint, Dockerfile, Foundry config
 docs/                         Optional GitHub Actions deployment template
 AZURE_SETUP.md                Azure infrastructure and deployment setup guide
 ```
@@ -24,14 +24,14 @@ The root stays intentionally small: project metadata, README, license, and syste
 frontend -> orchestrator API or hosted orchestrator agent -> Intake Agent -> Routing Agent -> Notification Agent
 ```
 
-Local development uses real Foundry model calls by default. Copy [orchestrator/env.example](orchestrator/env.example) to `.env` and set your own Foundry project values:
+Local development uses real Foundry model calls by default. Copy [agents/orchestrator/env.example](agents/orchestrator/env.example) to `.env` and set your own Foundry project values:
 
 - Foundry project endpoint: `https://<YOUR-RESOURCE>.services.ai.azure.com/api/projects/<YOUR-PROJECT>`
 - Model deployment: `gpt-5.4`
 
 The local orchestrator is aligned with the Microsoft Agent Framework agents-in-workflows samples: it builds three `Agent` instances, wraps them with `AgentExecutor(context_mode="last_agent")`, wires them with `WorkflowBuilder`, and can run the full workflow in process for development.
 
-The hosted orchestrator follows the same `WorkflowBuilder` shape, but its nodes are custom `Executor` steps that call `FoundryAgent(...)` references to the separately deployed `intake-agent`, `routing-agent`, and `notification-agent` resources in Foundry. That keeps the three agents separated in the Foundry control plane while still exposing one end-to-end coordinator.
+The hosted orchestrator follows the same `WorkflowBuilder` shape, but its nodes are custom `Executor` steps that call `FoundryAgent(...)` references to the separately deployed `municipal-incident-intake`, `municipal-incident-routing`, and `municipal-incident-notification` resources in Foundry. That keeps the three agents separated in the Foundry control plane while still exposing one end-to-end coordinator.
 
 You can run either:
 
@@ -43,14 +43,14 @@ After the three individual agents are deployed as Foundry hosted agents, set `OR
 
 ## Observability
 
-Every agent entrypoint and the orchestrator call [orchestrator/observability.py](orchestrator/observability.py), which enables Agent Framework instrumentation. Foundry hosted agents use the platform telemetry exporters that are injected at runtime. Local and Container Apps frontend/API runs export to Application Insights when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.
+Every agent entrypoint and the orchestrator call [agents/orchestrator/observability.py](agents/orchestrator/observability.py), which enables Agent Framework instrumentation. Foundry hosted agents use the platform telemetry exporters that are injected at runtime. Local and Container Apps frontend/API runs export to Application Insights when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.
 
 The hosted-agent manifests set `ENABLE_SENSITIVE_DATA=true` for this demo so Foundry traces can show prompt and response details. Set it to `false` before using real citizen data.
 
 ## Local Run Options
 
 ```bash
-cp orchestrator/env.example .env
+cp agents/orchestrator/env.example .env
 az login
 python3 -m venv .venv
 source .venv/bin/activate
@@ -103,13 +103,13 @@ Open `http://localhost:8501`.
 
 This uses two local orchestrator processes and the three deployed Foundry hosted agents:
 
-- `orchestrator/main.py` runs the hosted-agent-compatible Responses server on port `8088` and coordinates deployed hosted agents.
+- [agents/orchestrator/main.py](agents/orchestrator/main.py) runs the hosted-agent-compatible Responses server on port `8088` and coordinates deployed hosted agents.
 - FastAPI runs on port `8000` and proxies incident requests to that local Responses endpoint.
 
 Start the local hosted-agent-compatible orchestrator server:
 
 ```bash
-python orchestrator/main.py
+python -m orchestrator.main
 ```
 
 It exposes the Responses protocol on `http://localhost:8088/responses`.
@@ -138,9 +138,9 @@ Set:
 
 ```bash
 ORCHESTRATION_BACKEND=hosted
-INTAKE_AGENT_NAME=intake-agent
-ROUTING_AGENT_NAME=routing-agent
-NOTIFICATION_AGENT_NAME=notification-agent
+INTAKE_AGENT_NAME=municipal-incident-intake
+ROUTING_AGENT_NAME=municipal-incident-routing
+NOTIFICATION_AGENT_NAME=municipal-incident-notification
 ```
 
 Then run the API and frontend as in Option 2.
@@ -155,10 +155,10 @@ The orchestrator itself can also be deployed or run as a Foundry hosted coordina
 
 Each hosted agent has its own code folder:
 
-- [agents/intake-agent](agents/intake-agent)
-- [agents/routing-agent](agents/routing-agent)
-- [agents/notification-agent](agents/notification-agent)
-- [orchestrator](orchestrator)
+- [agents/municipal-incident-intake](agents/municipal-incident-intake)
+- [agents/municipal-incident-routing](agents/municipal-incident-routing)
+- [agents/municipal-incident-notification](agents/municipal-incident-notification)
+- [agents/orchestrator](agents/orchestrator)
 
 Each agent folder owns its prompt, `main.py`, `Dockerfile`, `requirements.txt`, and `agent.yaml`.
 The orchestrator owns the same hosted-agent assets plus `Dockerfile.hosted` for Foundry hosted-agent deployment and `Dockerfile` for the FastAPI bridge. Its hosted entrypoint coordinates deployed agents; the CLI and local API mode still support an in-process workflow for development.

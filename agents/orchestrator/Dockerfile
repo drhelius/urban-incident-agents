@@ -7,7 +7,6 @@ ENV PIP_DEFAULT_TIMEOUT=300
 ENV PIP_RETRIES=20
 
 COPY pyproject.toml README.md ./
-COPY orchestrator ./orchestrator
 COPY agents ./agents
 
 RUN pip install --no-cache-dir --retries 20 --timeout 300 ".[api,observability]"

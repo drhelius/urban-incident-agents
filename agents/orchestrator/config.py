@@ -23,9 +23,9 @@ class Settings:
     foundry_project_endpoint: str = DEFAULT_PROJECT_ENDPOINT
     model_deployment_name: str = DEFAULT_MODEL_DEPLOYMENT
     orchestration_backend: str = "local"
-    intake_agent_name: str = "intake-agent"
-    routing_agent_name: str = "routing-agent"
-    notification_agent_name: str = "notification-agent"
+    intake_agent_name: str = "municipal-incident-intake"
+    routing_agent_name: str = "municipal-incident-routing"
+    notification_agent_name: str = "municipal-incident-notification"
     intake_agent_version: str | None = None
     routing_agent_version: str | None = None
     notification_agent_version: str | None = None
@@ -44,9 +44,11 @@ class Settings:
                 "AZURE_AI_MODEL_DEPLOYMENT_NAME", DEFAULT_MODEL_DEPLOYMENT
             ),
             orchestration_backend=os.getenv("ORCHESTRATION_BACKEND", "local").strip().lower(),
-            intake_agent_name=os.getenv("INTAKE_AGENT_NAME", "intake-agent"),
-            routing_agent_name=os.getenv("ROUTING_AGENT_NAME", "routing-agent"),
-            notification_agent_name=os.getenv("NOTIFICATION_AGENT_NAME", "notification-agent"),
+            intake_agent_name=os.getenv("INTAKE_AGENT_NAME", "municipal-incident-intake"),
+            routing_agent_name=os.getenv("ROUTING_AGENT_NAME", "municipal-incident-routing"),
+            notification_agent_name=os.getenv(
+                "NOTIFICATION_AGENT_NAME", "municipal-incident-notification"
+            ),
             intake_agent_version=_optional_env("INTAKE_AGENT_VERSION"),
             routing_agent_version=_optional_env("ROUTING_AGENT_VERSION"),
             notification_agent_version=_optional_env("NOTIFICATION_AGENT_VERSION"),

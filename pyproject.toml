@@ -43,7 +43,7 @@ dev = [
 urban-incidents = "orchestrator.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["agents"]
 include = ["orchestrator*"]
 exclude = ["frontend*"]
 

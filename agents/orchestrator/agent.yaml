@@ -19,8 +19,8 @@ environment_variables:
   - name: ENABLE_SENSITIVE_DATA
     value: "true"
   - name: INTAKE_AGENT_NAME
-    value: intake-agent
+    value: municipal-incident-intake
   - name: ROUTING_AGENT_NAME
-    value: routing-agent
+    value: municipal-incident-routing
   - name: NOTIFICATION_AGENT_NAME
-    value: notification-agent
+    value: municipal-incident-notification

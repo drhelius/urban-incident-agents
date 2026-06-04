@@ -153,10 +153,10 @@ The observability goals are:
 Each deployable owns its own runtime and deployment assets:
 
 - `frontend/` owns the Streamlit app, frontend container, and frontend Container Apps descriptor.
-- `orchestrator/` owns the API bridge, workflow, hosted coordinator entrypoint, orchestrator containers, Foundry metadata, and Container Apps descriptor.
-- `agents/intake-agent/` owns the Intake Agent prompt, entrypoint, container, requirements, and Foundry metadata.
-- `agents/routing-agent/` owns the Routing Agent prompt, entrypoint, container, requirements, and Foundry metadata.
-- `agents/notification-agent/` owns the Notification Agent prompt, entrypoint, container, requirements, and Foundry metadata.
+- `agents/orchestrator/` owns the API bridge, workflow, hosted coordinator entrypoint, orchestrator containers, Foundry metadata, and Container Apps descriptor.
+- `agents/municipal-incident-intake/` owns the Intake Agent prompt, entrypoint, container, requirements, and Foundry metadata.
+- `agents/municipal-incident-routing/` owns the Routing Agent prompt, entrypoint, container, requirements, and Foundry metadata.
+- `agents/municipal-incident-notification/` owns the Notification Agent prompt, entrypoint, container, requirements, and Foundry metadata.
 - `AZURE_SETUP.md` owns Azure infrastructure and deployment setup guidance.
 - `docs/` owns reusable operational templates such as the optional GitHub Actions workflow.
 

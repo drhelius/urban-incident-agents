@@ -25,7 +25,7 @@ jobs:
             --image urban-incidents-orchestrator:${{ github.sha }} \
             --platform linux/amd64 \
             --source-acr-auth-id "[caller]" \
-            --file orchestrator/Dockerfile \
+            --file agents/orchestrator/Dockerfile \
             .
 
       - name: Build frontend image in ACR
@@ -40,7 +40,7 @@ jobs:
 
       - name: Prepare Container Apps descriptors
         run: |
-          cp orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+          cp agents/orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
           cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
           sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
           sed -i "s/{image-tag}/${{ github.sha }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml

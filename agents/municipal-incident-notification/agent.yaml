@@ -1,6 +1,6 @@
 kind: hosted
-name: intake-agent
-description: Extracts municipal incident type, location, assets, risks, missing details, and summary.
+name: municipal-incident-notification
+description: Generates a friendly citizen-facing notification from intake and routing results.
 protocols:
   - protocol: responses
     version: 1.0.0
@@ -13,7 +13,7 @@ environment_variables:
   - name: ENABLE_INSTRUMENTATION
     value: "true"
   - name: OTEL_SERVICE_NAME
-    value: intake-agent
+    value: municipal-incident-notification
   - name: OTEL_TRACES_SAMPLER
     value: always_on
   - name: ENABLE_SENSITIVE_DATA

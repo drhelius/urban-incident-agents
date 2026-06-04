@@ -197,9 +197,9 @@ def build_orchestrator_agent(settings: Settings | None = None):
         default_options={"store": False},
     )
 
-    mark_agent_created("intake-agent", "Intake Agent")
-    mark_agent_created("routing-agent", "Routing Agent")
-    mark_agent_created("notification-agent", "Notification Agent")
+    mark_agent_created("municipal-incident-intake", "Intake Agent")
+    mark_agent_created("municipal-incident-routing", "Routing Agent")
+    mark_agent_created("municipal-incident-notification", "Notification Agent")
     mark_agent_created(ORCHESTRATOR_AGENT_ID, ORCHESTRATOR_AGENT_NAME)
 
     intake_executor = AgentExecutor(intake_agent, context_mode="last_agent")
@@ -229,17 +229,17 @@ def build_remote_orchestrator_agent(settings: Settings | None = None):
 
     request_executor = IncidentRequestEnvelope()
     intake_executor = RemoteIntakeAgentExecutor(
-        id="call-intake-agent",
+        id="call-municipal-incident-intake",
         client=hosted_client,
         agent_name=names["intake"],
     )
     routing_executor = RemoteRoutingAgentExecutor(
-        id="call-routing-agent",
+        id="call-municipal-incident-routing",
         client=hosted_client,
         agent_name=names["routing"],
     )
     notification_executor = RemoteNotificationAgentExecutor(
-        id="call-notification-agent",
+        id="call-municipal-incident-notification",
         client=hosted_client,
         agent_name=names["notification"],
     )
