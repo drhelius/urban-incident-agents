@@ -41,6 +41,7 @@ dev = [
 
 [project.scripts]
 urban-incidents = "orchestrator.cli:main"
+urban-incidents-exerciser = "orchestrator.exerciser:main"
 
 [tool.setuptools.packages.find]
 where = ["agents"]

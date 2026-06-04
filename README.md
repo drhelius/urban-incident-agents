@@ -342,3 +342,12 @@ echo "API health: $ORCHESTRATOR_URL/health"
 
 curl -sS "$ORCHESTRATOR_URL/health"
 ```
+
+## 19. Run Remote Orchestrator Exerciser
+
+```bash
+urban-incidents-exerciser \
+  --threads 4 \
+  --min-seconds 2 \
+  --max-seconds 10
+```
