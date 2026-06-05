@@ -13,8 +13,8 @@ properties:
         identity: system
   template:
     containers:
-      - name: incident-orchestrator
-        image: "{acr-name}.azurecr.io/urban-incidents-orchestrator:{image-tag}"
+      - name: incident-api
+        image: "{acr-name}.azurecr.io/urban-incidents-api:{image-tag}"
         resources:
           cpu: 0.5
           memory: 1Gi
@@ -27,6 +27,8 @@ properties:
             value: "{application-insights-connection-string}"
           - name: ORCHESTRATION_BACKEND
             value: hosted
+          - name: ORCHESTRATOR_AGENT_NAME
+            value: municipal-incident-orchestrator
           - name: INTAKE_AGENT_NAME
             value: municipal-incident-intake
           - name: ROUTING_AGENT_NAME

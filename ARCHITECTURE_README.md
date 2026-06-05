@@ -23,7 +23,7 @@ The orchestrator is the system boundary for the complete workflow. It has two ro
 
 The local orchestrator is aligned with the Microsoft Agent Framework agents-in-workflows samples. It can build three Agent Framework agents, wrap them with `AgentExecutor` using last-agent context, and wire them with `WorkflowBuilder` for local development.
 
-The deployed application path uses the FastAPI bridge to call already deployed hosted worker agents directly. That means Intake, Routing, and Notification remain separate Foundry control-plane resources with their own versions, traces, metrics, and cost attribution.
+The deployed application path uses the FastAPI bridge to call the deployed Foundry hosted orchestrator agent. The hosted orchestrator calls the deployed Intake, Routing, and Notification hosted agents. That means all four agents remain separate Foundry control-plane resources with their own versions, traces, metrics, and cost attribution.
 
 This means the full flow can be run as one deployable orchestrator agent, while the individual agents can also be deployed and invoked independently.
 
@@ -104,13 +104,13 @@ This mode allows each agent to be invoked, scaled, tested, observed, and version
 
 ### Hosted Coordinator Agent
 
-The orchestrator can also be deployed as a Foundry Hosted Agent for hosted-coordinator experiments. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification hosted agents in sequence through Agent Framework workflow composition.
+The orchestrator is deployed as a Foundry Hosted Agent. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification hosted agents in sequence through Agent Framework workflow composition.
 
-This mode is optional and is not required for the supported ACA frontend/API deployment path.
+This is the hosted entrypoint used by the ACA frontend/API deployment path.
 
 ### Frontend and API on Azure Container Apps
 
-The Streamlit frontend and FastAPI bridge can be deployed to Azure Container Apps. The FastAPI bridge can either run the workflow itself or call the three deployed worker hosted agents, depending on configuration.
+The Streamlit frontend and FastAPI bridge can be deployed to Azure Container Apps. The FastAPI bridge can either run the workflow itself for local development or call the deployed hosted orchestrator agent.
 
 ## Foundry Integration
 
@@ -138,7 +138,7 @@ Each agent entrypoint and the orchestrator configure OpenTelemetry instrumentati
 
 The code emits agent creation spans with generative AI semantic attributes so Foundry Control Plane can correlate traces with registered or hosted agents.
 
-The frontend, FastAPI bridge, and deployed hosted-agent client path use W3C trace-context propagation. The frontend injects trace headers into API calls, and the API injects trace headers into deployed Responses calls. For a complete end-to-end trace, every component should export to the same Application Insights resource, and each network hop must preserve the `traceparent` context.
+The frontend, FastAPI bridge, hosted orchestrator, and worker hosted agents use W3C trace-context propagation. The frontend injects trace headers into API calls, and the API injects trace headers into deployed Responses calls. For a complete end-to-end trace, every component should export to the same Application Insights resource, and each network hop must preserve the `traceparent` context.
 
 The observability goals are:
 

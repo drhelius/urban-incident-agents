@@ -19,6 +19,7 @@ FOUNDRY_PROJECT_ENDPOINT=https://<foundry-account-name>.services.ai.azure.com/ap
 AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5.4
 ORCHESTRATION_BACKEND=local
 APPLICATIONINSIGHTS_CONNECTION_STRING=<foundry-app-insights-connection-string>
+ORCHESTRATOR_AGENT_NAME=municipal-incident-orchestrator
 INTAKE_AGENT_NAME=municipal-incident-intake
 ROUTING_AGENT_NAME=municipal-incident-routing
 NOTIFICATION_AGENT_NAME=municipal-incident-notification
@@ -61,7 +62,7 @@ APP_RG="<resource-group>"
 
 ACR_NAME="<acr-name>"
 ACA_ENV_NAME="<container-apps-env-name>"
-ACA_ORCHESTRATOR_NAME="<orchestrator-container-app-name>"
+ACA_API_NAME="<api-container-app-name>"
 ACA_FRONTEND_NAME="<frontend-container-app-name>"
 
 FOUNDRY_ACCOUNT_NAME="<foundry-account-name>"
@@ -71,7 +72,7 @@ FOUNDRY_PROJECT_ID=$(az resource list \
   --resource-type Microsoft.CognitiveServices/accounts/projects \
   --query "[?name=='$FOUNDRY_ACCOUNT_NAME/$FOUNDRY_PROJECT_NAME'].id | [0]" \
   -o tsv)
-AZURE_AI_MODEL_DEPLOYMENT_NAME="gpt-5.4"
+AZURE_AI_MODEL_DEPLOYMENT_NAME="<model-name>"
 
 APP_INSIGHTS_NAME="<foundry-connected-app-insights-name>"
 APP_INSIGHTS_RG="$APP_RG"
@@ -179,20 +180,22 @@ for ROLE in \
 done
 ```
 
-## 10. Deploy Foundry Worker Agents
+## 10. Deploy Foundry Agents
 
 ```bash
 azd deploy municipal-incident-intake
 azd deploy municipal-incident-routing
 azd deploy municipal-incident-notification
+azd deploy municipal-incident-orchestrator
 ```
 
-## 11. Verify Foundry Worker Agents
+## 11. Verify Foundry Agents
 
 ```bash
 azd ai agent invoke municipal-incident-intake "Water leak near City Hospital is flooding the road"
 azd ai agent invoke municipal-incident-routing "<paste Intake Agent JSON here>"
 azd ai agent invoke municipal-incident-notification "<paste Routing Agent envelope JSON here>"
+azd ai agent invoke municipal-incident-orchestrator "Water leak near City Hospital is flooding the road"
 ```
 
 ## 12. Build ACA Images
@@ -200,7 +203,7 @@ azd ai agent invoke municipal-incident-notification "<paste Routing Agent envelo
 ```bash
 az acr build \
   --registry "$ACR_NAME" \
-  --image urban-incidents-orchestrator:$IMAGE_TAG \
+  --image urban-incidents-api:$IMAGE_TAG \
   --platform linux/amd64 \
   --source-acr-auth-id "[caller]" \
   --file agents/orchestrator/Dockerfile \
@@ -219,7 +222,7 @@ az acr build \
 
 ```bash
 az containerapp create \
-  --name "$ACA_ORCHESTRATOR_NAME" \
+  --name "$ACA_API_NAME" \
   --resource-group "$APP_RG" \
   --environment "$ACA_ENV_NAME" \
   --image mcr.microsoft.com/k8se/quickstart:latest \
@@ -240,8 +243,8 @@ az containerapp create \
 ## 14. Grant ACA ACR Pull Access
 
 ```bash
-ACA_ORCHESTRATOR_PRINCIPAL_ID=$(az containerapp identity show \
-  --name "$ACA_ORCHESTRATOR_NAME" \
+ACA_API_PRINCIPAL_ID=$(az containerapp identity show \
+  --name "$ACA_API_NAME" \
   --resource-group "$APP_RG" \
   --query principalId -o tsv)
 
@@ -250,7 +253,7 @@ ACA_FRONTEND_PRINCIPAL_ID=$(az containerapp identity show \
   --resource-group "$APP_RG" \
   --query principalId -o tsv)
 
-for PRINCIPAL_ID in "$ACA_ORCHESTRATOR_PRINCIPAL_ID" "$ACA_FRONTEND_PRINCIPAL_ID"; do
+for PRINCIPAL_ID in "$ACA_API_PRINCIPAL_ID" "$ACA_FRONTEND_PRINCIPAL_ID"; do
   az role assignment create \
     --assignee "$PRINCIPAL_ID" \
     --role "Container Registry Repository Reader" \
@@ -263,7 +266,7 @@ for PRINCIPAL_ID in "$ACA_ORCHESTRATOR_PRINCIPAL_ID" "$ACA_FRONTEND_PRINCIPAL_ID
 done
 
 az containerapp registry set \
-  --name "$ACA_ORCHESTRATOR_NAME" \
+  --name "$ACA_API_NAME" \
   --resource-group "$APP_RG" \
   --server "$ACR_LOGIN_SERVER" \
   --identity system
@@ -284,7 +287,7 @@ FOUNDRY_ACCOUNT_ID=$(az cognitiveservices account show \
   --query id -o tsv)
 
 az role assignment create \
-  --assignee "$ACA_ORCHESTRATOR_PRINCIPAL_ID" \
+  --assignee "$ACA_API_PRINCIPAL_ID" \
   --role "Foundry User" \
   --scope "$FOUNDRY_ACCOUNT_ID"
 ```
@@ -292,25 +295,25 @@ az role assignment create \
 ## 16. Deploy ACA API
 
 ```bash
-cp agents/orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+cp agents/orchestrator/containerapp.yaml /tmp/containerapp-api.yaml
 
-sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-orchestrator.yaml
-sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-orchestrator.yaml
-sed -i "s|{foundry-project-endpoint}|$FOUNDRY_PROJECT_ENDPOINT|g" /tmp/containerapp-orchestrator.yaml
-sed -i "s|{model-deployment-name}|$AZURE_AI_MODEL_DEPLOYMENT_NAME|g" /tmp/containerapp-orchestrator.yaml
-sed -i "s|{application-insights-connection-string}|$APPLICATIONINSIGHTS_CONNECTION_STRING|g" /tmp/containerapp-orchestrator.yaml
+sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-api.yaml
+sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-api.yaml
+sed -i "s|{foundry-project-endpoint}|$FOUNDRY_PROJECT_ENDPOINT|g" /tmp/containerapp-api.yaml
+sed -i "s|{model-deployment-name}|$AZURE_AI_MODEL_DEPLOYMENT_NAME|g" /tmp/containerapp-api.yaml
+sed -i "s|{application-insights-connection-string}|$APPLICATIONINSIGHTS_CONNECTION_STRING|g" /tmp/containerapp-api.yaml
 
 az containerapp update \
-  --name "$ACA_ORCHESTRATOR_NAME" \
+  --name "$ACA_API_NAME" \
   --resource-group "$APP_RG" \
-  --yaml /tmp/containerapp-orchestrator.yaml
+  --yaml /tmp/containerapp-api.yaml
 
-ORCHESTRATOR_FQDN=$(az containerapp show \
-  --name "$ACA_ORCHESTRATOR_NAME" \
+API_FQDN=$(az containerapp show \
+  --name "$ACA_API_NAME" \
   --resource-group "$APP_RG" \
   --query properties.configuration.ingress.fqdn -o tsv)
 
-ORCHESTRATOR_URL="https://$ORCHESTRATOR_FQDN"
+API_URL="https://$API_FQDN"
 ```
 
 ## 17. Deploy ACA Frontend
@@ -320,7 +323,7 @@ cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
 
 sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-frontend.yaml
 sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-frontend.yaml
-sed -i "s|{api-url}|$ORCHESTRATOR_URL|g" /tmp/containerapp-frontend.yaml
+sed -i "s|{api-url}|$API_URL|g" /tmp/containerapp-frontend.yaml
 sed -i "s|{application-insights-connection-string}|$APPLICATIONINSIGHTS_CONNECTION_STRING|g" /tmp/containerapp-frontend.yaml
 
 az containerapp update \
@@ -338,9 +341,9 @@ FRONTEND_FQDN=$(az containerapp show \
   --query properties.configuration.ingress.fqdn -o tsv)
 
 echo "Frontend: https://$FRONTEND_FQDN"
-echo "API health: $ORCHESTRATOR_URL/health"
+echo "API health: $API_URL/health"
 
-curl -sS "$ORCHESTRATOR_URL/health"
+curl -sS "$API_URL/health"
 ```
 
 ## 19. Run Remote Orchestrator Exerciser

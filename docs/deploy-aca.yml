@@ -1,4 +1,4 @@
-name: Deploy Orchestrator and Frontend to Azure Container Apps
+name: Deploy API and Frontend to Azure Container Apps
 
 on:
   workflow_dispatch:
@@ -18,11 +18,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Build orchestrator image in ACR
+      - name: Build API image in ACR
         run: |
           az acr build \
             --registry ${{ secrets.ACR_NAME }} \
-            --image urban-incidents-orchestrator:${{ github.sha }} \
+            --image urban-incidents-api:${{ github.sha }} \
             --platform linux/amd64 \
             --source-acr-auth-id "[caller]" \
             --file agents/orchestrator/Dockerfile \
@@ -40,20 +40,20 @@ jobs:
 
       - name: Prepare Container Apps descriptors
         run: |
-          cp agents/orchestrator/containerapp.yaml /tmp/containerapp-orchestrator.yaml
+          cp agents/orchestrator/containerapp.yaml /tmp/containerapp-api.yaml
           cp frontend/containerapp.yaml /tmp/containerapp-frontend.yaml
-          sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
-          sed -i "s/{image-tag}/${{ github.sha }}/g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
-          sed -i "s|{foundry-project-endpoint}|${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}|g" /tmp/containerapp-orchestrator.yaml
-          sed -i "s|{model-deployment-name}|${{ secrets.AZURE_AI_MODEL_DEPLOYMENT_NAME }}|g" /tmp/containerapp-orchestrator.yaml
-          sed -i "s|{application-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" /tmp/containerapp-orchestrator.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s/{acr-name}/${{ secrets.ACR_NAME }}/g" /tmp/containerapp-api.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s/{image-tag}/${{ github.sha }}/g" /tmp/containerapp-api.yaml /tmp/containerapp-frontend.yaml
+          sed -i "s|{foundry-project-endpoint}|${{ secrets.FOUNDRY_PROJECT_ENDPOINT }}|g" /tmp/containerapp-api.yaml
+          sed -i "s|{model-deployment-name}|${{ secrets.AZURE_AI_MODEL_DEPLOYMENT_NAME }}|g" /tmp/containerapp-api.yaml
+          sed -i "s|{application-insights-connection-string}|${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}|g" /tmp/containerapp-api.yaml /tmp/containerapp-frontend.yaml
           sed -i "s|{api-url}|${{ secrets.INCIDENT_API_URL }}|g" /tmp/containerapp-frontend.yaml
 
-      - name: Deploy orchestrator Container App
+      - name: Deploy API Container App
         uses: azure/container-apps-deploy-action@v1
         with:
-          yamlConfigPath: /tmp/containerapp-orchestrator.yaml
-          containerAppName: ${{ secrets.ACA_ORCHESTRATOR_NAME }}
+          yamlConfigPath: /tmp/containerapp-api.yaml
+          containerAppName: ${{ secrets.ACA_API_NAME }}
           containerAppEnvironment: ${{ secrets.ACA_ENV_NAME }}
           resourceGroup: ${{ secrets.ACA_RG }}
 

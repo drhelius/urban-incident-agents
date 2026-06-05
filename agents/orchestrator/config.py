@@ -23,9 +23,11 @@ class Settings:
     foundry_project_endpoint: str = DEFAULT_PROJECT_ENDPOINT
     model_deployment_name: str = DEFAULT_MODEL_DEPLOYMENT
     orchestration_backend: str = "local"
+    orchestrator_agent_name: str = "municipal-incident-orchestrator"
     intake_agent_name: str = "municipal-incident-intake"
     routing_agent_name: str = "municipal-incident-routing"
     notification_agent_name: str = "municipal-incident-notification"
+    orchestrator_agent_version: str | None = None
     intake_agent_version: str | None = None
     routing_agent_version: str | None = None
     notification_agent_version: str | None = None
@@ -44,11 +46,15 @@ class Settings:
                 "AZURE_AI_MODEL_DEPLOYMENT_NAME", DEFAULT_MODEL_DEPLOYMENT
             ),
             orchestration_backend=os.getenv("ORCHESTRATION_BACKEND", "local").strip().lower(),
+            orchestrator_agent_name=os.getenv(
+                "ORCHESTRATOR_AGENT_NAME", "municipal-incident-orchestrator"
+            ),
             intake_agent_name=os.getenv("INTAKE_AGENT_NAME", "municipal-incident-intake"),
             routing_agent_name=os.getenv("ROUTING_AGENT_NAME", "municipal-incident-routing"),
             notification_agent_name=os.getenv(
                 "NOTIFICATION_AGENT_NAME", "municipal-incident-notification"
             ),
+            orchestrator_agent_version=_optional_env("ORCHESTRATOR_AGENT_VERSION"),
             intake_agent_version=_optional_env("INTAKE_AGENT_VERSION"),
             routing_agent_version=_optional_env("ROUTING_AGENT_VERSION"),
             notification_agent_version=_optional_env("NOTIFICATION_AGENT_VERSION"),
@@ -80,6 +86,8 @@ class Settings:
             "foundry_project_endpoint": self.foundry_project_endpoint,
             "model_deployment_name": self.model_deployment_name,
             "orchestration_backend": self.orchestration_backend,
+            "orchestrator_agent_name": self.orchestrator_agent_name,
+            "orchestrator_agent_version": self.orchestrator_agent_version,
             "intake_agent_name": self.intake_agent_name,
             "routing_agent_name": self.routing_agent_name,
             "notification_agent_name": self.notification_agent_name,

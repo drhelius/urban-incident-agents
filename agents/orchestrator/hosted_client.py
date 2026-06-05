@@ -1,24 +1,15 @@
 from __future__ import annotations
 
-import asyncio
+from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
 import httpx
+from agent_framework import AgentSession
 
-from orchestrator.agent_prompts import (
-    build_intake_prompt,
-    build_notification_prompt,
-    build_routing_prompt,
-)
 from orchestrator.config import Settings, get_settings, load_dotenv_if_available
 from orchestrator.json_utils import extract_json_object
-from orchestrator.models import (
-    IncidentWorkflowResult,
-    IntakeResult,
-    NotificationResult,
-    RoutingResult,
-)
+from orchestrator.models import IncidentWorkflowResult
 from orchestrator.observability import inject_trace_context, trace_span
 
 
@@ -28,49 +19,67 @@ class HostedAgentResponsesClient:
         self.settings = settings
         self._credential = None
 
-    async def run(self, agent_name: str, prompt: str) -> str:
-        token = await self._token()
-        endpoint = _responses_endpoint(self.settings.foundry_project_endpoint, agent_name)
-        headers = inject_trace_context(
-            {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-            }
-        )
-        payload = {"input": prompt, "stream": False, "store": False}
-        timeout = httpx.Timeout(self.settings.request_timeout_seconds)
+    async def run(self, agent_name: str, prompt: str, agent_version: str | None = None) -> str:
         with trace_span(
             "orchestrator.call_hosted_agent",
             {
                 "gen_ai.agent.name": agent_name,
-                "http.url": endpoint,
+                "gen_ai.agent.version": agent_version or "latest",
             },
         ):
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(endpoint, headers=headers, json=payload)
-                try:
-                    response.raise_for_status()
-                except httpx.HTTPStatusError as exc:
-                    raise RuntimeError(
-                        f"Hosted agent {agent_name!r} call failed with "
-                        f"{response.status_code}: {response.text}"
-                    ) from exc
-            return _responses_text(response.json())
+            return await self._run_foundry_agent(agent_name, prompt, agent_version)
 
-    async def _token(self) -> str:
-        if self._credential is None:
+    async def _run_foundry_agent(
+        self, agent_name: str, prompt: str, agent_version: str | None
+    ) -> str:
+        try:
+            from agent_framework.foundry import FoundryAgent
+            from azure.ai.projects.aio import AIProjectClient
+            from azure.ai.projects.models import VersionRefIndicator
+            from azure.identity.aio import DefaultAzureCredential
+        except ImportError as exc:
+            raise RuntimeError(
+                "Hosted orchestration requires agent-framework-foundry, azure-ai-projects, "
+                "and azure-identity. Install dependencies with: pip install -e ."
+            ) from exc
+
+        credential = DefaultAzureCredential()
+        async with (
+            AIProjectClient(
+                endpoint=self.settings.foundry_project_endpoint,
+                credential=credential,
+                allow_preview=True,
+            ) as project_client,
+            FoundryAgent(
+                project_client=project_client,
+                agent_name=agent_name,
+                agent_version=agent_version,
+                allow_preview=True,
+                default_options={"store": False},
+            ) as agent,
+        ):
+            resolved_version = await _resolve_agent_version(project_client, agent_name, agent_version)
+            service_session = await project_client.beta.agents.create_session(
+                agent_name=agent_name,
+                version_indicator=VersionRefIndicator(agent_version=resolved_version),
+            )
+            service_session_id = getattr(service_session, "agent_session_id", None)
+            if not isinstance(service_session_id, str) or not service_session_id:
+                raise RuntimeError(f"Hosted agent {agent_name!r} did not return a session id.")
+
+            session: AgentSession = agent.get_session(service_session_id)
             try:
-                from azure.identity import DefaultAzureCredential
-            except ImportError as exc:
-                raise RuntimeError(
-                    "Hosted orchestration requires azure-identity. Install dependencies with: pip install -e ."
-                ) from exc
-            self._credential = DefaultAzureCredential()
-
-        access_token = await asyncio.to_thread(
-            self._credential.get_token, self.settings.foundry_token_scope
-        )
-        return access_token.token
+                parts: list[str] = []
+                async for chunk in agent.run(prompt, session=session, stream=True):
+                    text = getattr(chunk, "text", "")
+                    if text:
+                        parts.append(text)
+                return "".join(parts)
+            finally:
+                await project_client.beta.agents.delete_session(
+                    agent_name=agent_name,
+                    session_id=service_session_id,
+                )
 
 
 async def run_hosted_workflow(
@@ -81,28 +90,33 @@ async def run_hosted_workflow(
         raise ValueError("Incident report text is required.")
 
     client = HostedAgentResponsesClient(active_settings)
-    names = active_settings.hosted_agent_names
-
-    intake_text = await client.run(names["intake"], build_intake_prompt(report))
-    intake = IntakeResult.from_mapping(extract_json_object(intake_text), raw_report=report)
-
-    if intake.is_urban_incident:
-        routing_text = await client.run(names["routing"], build_routing_prompt(report, intake))
-        routing = RoutingResult.from_mapping(extract_json_object(routing_text))
-    else:
-        routing = RoutingResult.not_applicable()
-
-    notification_text = await client.run(
-        names["notification"], build_notification_prompt(report, intake, routing)
+    orchestrator_text = await client.run(
+        active_settings.orchestrator_agent_name,
+        report.strip(),
+        active_settings.orchestrator_agent_version,
     )
-    notification = NotificationResult.from_mapping(extract_json_object(notification_text))
-    return IncidentWorkflowResult(
-        status="accepted" if intake.is_urban_incident else "rejected",
-        correlation_id=f"inc-{uuid4().hex[:12]}",
-        intake=intake,
-        routing=routing,
-        notification=notification,
+    return IncidentWorkflowResult.from_mapping(
+        extract_json_object(orchestrator_text), correlation_id=f"inc-{uuid4().hex[:12]}"
     )
+
+
+async def _resolve_agent_version(
+    project_client: Any, agent_name: str, agent_version: str | None
+) -> str:
+    if agent_version:
+        return agent_version
+
+    agent_details = await project_client.agents.get(agent_name=agent_name)
+    versions = getattr(agent_details, "versions", None)
+    latest = (
+        versions.get("latest")
+        if isinstance(versions, Mapping)
+        else getattr(versions, "latest", None)
+    )
+    resolved = getattr(latest, "version", None)
+    if not isinstance(resolved, str) or not resolved:
+        raise RuntimeError(f"Hosted agent {agent_name!r} did not include a latest version.")
+    return resolved
 
 
 async def run_local_responses_workflow(
