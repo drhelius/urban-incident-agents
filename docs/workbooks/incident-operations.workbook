@@ -1,0 +1,252 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# \ud83c\udfd9\ufe0f Urban Incident Triage \u2014 Operations\nEnd-to-end view of municipal incident reports processed by the Intake \u2192 Routing \u2192 Notification agent pipeline. Volume, acceptance, priority and department breakdowns are derived from the `urban_incident.reports` custom metric. Use the time range selector to scope every tile below."
+      },
+      "name": "text-header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "time-range-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 604800000
+                },
+                {
+                  "durationMs": 2592000000
+                }
+              ],
+              "allowCustom": true
+            },
+            "value": {
+              "durationMs": 604800000
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0
+      },
+      "name": "params-time-range"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend status = tostring(customDimensions.status)\n| summarize Total = sum(valueSum), Accepted = sumif(valueSum, status == \"accepted\")\n| extend Rejected = Total - Accepted\n| extend Rate = iff(Total > 0, round(100.0 * Accepted / Total, 1), 0.0)\n| project Names = dynamic([\"Total Reports\", \"Accepted\", \"Rejected\", \"Acceptance %\"]),\n          Vals = pack_array(Total, Accepted, Rejected, Rate)\n| mv-expand Metric = Names to typeof(string), Value = Vals to typeof(real)\n| project Metric, Value",
+        "size": 0,
+        "title": "Report volume",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "tiles",
+        "chartSettings": {},
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "Metric",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "blue"
+            }
+          },
+          "showBorder": true,
+          "size": "auto"
+        }
+      },
+      "name": "kpi-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend Priority = tostring(customDimensions.priority)\n| summarize Reports = sum(valueSum) by Priority\n| order by Priority asc",
+        "size": 0,
+        "title": "Reports by priority",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "piechart",
+        "chartSettings": {
+          "showLegend": true
+        }
+      },
+      "name": "reports-by-priority",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend Status = tostring(customDimensions.status)\n| summarize Reports = sum(valueSum) by Status\n| order by Reports desc",
+        "size": 0,
+        "title": "Accepted vs rejected",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "piechart",
+        "chartSettings": {
+          "showLegend": true
+        }
+      },
+      "name": "reports-by-status",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend Department = tostring(customDimensions.department)\n| summarize Reports = sum(valueSum) by Department\n| order by Reports desc",
+        "size": 0,
+        "title": "Reports by department",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "barchart"
+      },
+      "name": "reports-by-department"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend Priority = tostring(customDimensions.priority)\n| summarize Reports = sum(valueSum) by bin(timestamp, 1h), Priority\n| order by timestamp asc",
+        "size": 0,
+        "title": "Report volume over time (by priority)",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "reports-over-time"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "customMetrics\n| where name == \"urban_incident.reports\"\n| extend Priority = tostring(customDimensions.priority),\n         Department = tostring(customDimensions.department)\n| summarize Reports = sum(valueSum) by Department, Priority\n| evaluate pivot(Priority, sum(Reports), Department)\n| order by Department asc",
+        "size": 0,
+        "title": "Priority \u00d7 department breakdown",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "table"
+      },
+      "name": "priority-department-matrix"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## \u2699\ufe0f Pipeline health\nAgent activity and end-to-end processing latency for the orchestrated workflow."
+      },
+      "name": "text-pipeline-health"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"invoke_agent \"\n| extend Agent = tostring(substring(name, 13))\n| where Agent startswith \"municipal-incident-\"\n| summarize Invocations = count() by Agent\n| order by Invocations desc",
+        "size": 0,
+        "title": "Agent invocations",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "barchart"
+      },
+      "name": "agent-invocations",
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name == \"api.triage_incident\"\n| summarize [\"p50 (ms)\"] = percentile(duration, 50),\n            [\"p95 (ms)\"] = percentile(duration, 95)\n            by bin(timestamp, 30m)\n| order by timestamp asc",
+        "size": 0,
+        "title": "End-to-end processing latency",
+        "timeContext": {
+          "durationMs": 0
+        },
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "<APPINSIGHTS_RESOURCE_ID>"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "processing-latency",
+      "customWidth": "50"
+    }
+  ],
+  "isLocked": false,
+  "fallbackResourceIds": [
+    "<APPINSIGHTS_RESOURCE_ID>"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

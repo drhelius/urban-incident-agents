@@ -54,6 +54,55 @@ def mark_agent_created(agent_id: str, agent_name: str) -> None:
         span.set_attribute("gen_ai.agent.name", agent_name)
 
 
+_INCIDENT_REPORTS_COUNTER: Any | None = None
+_metrics_disabled = False
+
+
+def _incident_reports_counter() -> Any | None:
+    global _INCIDENT_REPORTS_COUNTER, _metrics_disabled
+    if _INCIDENT_REPORTS_COUNTER is not None or _metrics_disabled:
+        return _INCIDENT_REPORTS_COUNTER
+    try:
+        from opentelemetry import metrics
+
+        meter = metrics.get_meter("urban-incident-agents")
+        _INCIDENT_REPORTS_COUNTER = meter.create_counter(
+            "urban_incident.reports",
+            unit="{report}",
+            description=(
+                "Incident reports processed, dimensioned by status, priority, and department."
+            ),
+        )
+    except Exception as exc:
+        logger.info("Custom incident metrics are unavailable: %s", exc)
+        _metrics_disabled = True
+    return _INCIDENT_REPORTS_COUNTER
+
+
+def record_incident_metrics(status: str, priority: str, department: str) -> None:
+    """Emit one counter increment per processed report.
+
+    The single ``urban_incident.reports`` counter carries ``status``,
+    ``priority``, and ``department`` dimensions so a dashboard can derive the
+    total volume, accepted volume, and per-priority / per-department breakdowns
+    from one metric.
+    """
+    counter = _incident_reports_counter()
+    if counter is None:
+        return
+    try:
+        counter.add(
+            1,
+            {
+                "status": status,
+                "priority": priority,
+                "department": department,
+            },
+        )
+    except Exception as exc:
+        logger.debug("Failed to record incident metrics: %s", exc)
+
+
 @contextmanager
 def trace_span(
     name: str,
