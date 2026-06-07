@@ -41,13 +41,12 @@ dev = [
 ]
 
 [project.scripts]
-urban-incidents = "orchestrator.cli:main"
-urban-incidents-exerciser = "orchestrator.exerciser:main"
+urban-incidents = "incident_tools.cli:main"
+urban-incidents-exerciser = "incident_tools.exerciser:main"
 
 [tool.setuptools.packages.find]
-where = ["agents"]
-include = ["orchestrator*"]
-exclude = ["frontend*"]
+where = ["."]
+include = ["incident_core*", "incident_tools*"]
 
 [tool.ruff]
 line-length = 100

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from orchestrator.json_utils import dumps_compact
-from orchestrator.models import IntakeResult, RoutingResult
+from incident_core.json_utils import dumps_compact
+from incident_core.models import IntakeResult, RoutingResult
 
 NOTIFICATION_AGENT_INSTRUCTIONS = """
 You are the Notification Agent for a municipal service desk.

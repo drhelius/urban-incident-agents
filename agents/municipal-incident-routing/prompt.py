@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from orchestrator.json_utils import dumps_compact
-from orchestrator.models import IntakeResult
+from incident_core.json_utils import dumps_compact
+from incident_core.models import IntakeResult
 
 ALLOWED_DEPARTMENTS_TEXT = """
 - Public Works and Infrastructure

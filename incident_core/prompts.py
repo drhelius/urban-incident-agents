@@ -1,13 +1,33 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-from orchestrator.models import IntakeResult, RoutingResult
+from incident_core.models import IntakeResult, RoutingResult
 
-AGENTS_ROOT = Path(__file__).resolve().parent.parent
+
+def _find_agents_root() -> Path:
+    """Locate the ``agents/`` directory that holds each worker's ``prompt.py``.
+
+    The orchestrator reuses each worker's prompt as the single source of truth.
+    Resolution order: ``AGENTS_DIR`` override, then an upward search from this
+    module for an ``agents`` folder containing the known worker prompts.
+    """
+    override = os.getenv("AGENTS_DIR")
+    if override:
+        return Path(override)
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "agents"
+        if (candidate / "municipal-incident-intake" / "prompt.py").exists():
+            return candidate
+    return here.parent.parent / "agents"
+
+
+AGENTS_ROOT = _find_agents_root()
 
 
 @lru_cache(maxsize=3)

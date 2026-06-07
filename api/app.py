@@ -5,13 +5,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from orchestrator.config import get_settings
-from orchestrator.observability import (
+from incident_core.config import get_settings
+from incident_core.observability import (
     configure_observability,
     extract_trace_context,
     trace_span,
 )
-from orchestrator.service import process_incident_report
+from incident_core.service import process_incident_report
 
 configure_observability()
 

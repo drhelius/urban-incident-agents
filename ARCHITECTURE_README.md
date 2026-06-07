@@ -152,8 +152,11 @@ The observability goals are:
 
 Each deployable owns its own runtime and deployment assets:
 
+- `incident_core/` owns the shared library: configuration, models, observability, JSON helpers, the Foundry model client, prompt loading, the local and hosted workflows, the hosted-agent client, and the request dispatcher used by every surface.
+- `incident_tools/` owns the local developer scripts: the CLI (`urban-incidents`) and the hosted orchestrator exerciser (`urban-incidents-exerciser`).
+- `api/` owns the FastAPI bridge, its container, and its Container Apps descriptor.
 - `frontend/` owns the Streamlit app, frontend container, and frontend Container Apps descriptor.
-- `agents/orchestrator/` owns the API bridge, workflow, hosted coordinator entrypoint, orchestrator containers, Foundry metadata, and Container Apps descriptor.
+- `agents/municipal-incident-orchestrator/` owns the hosted coordinator entrypoint, container, requirements, and Foundry metadata.
 - `agents/municipal-incident-intake/` owns the Intake Agent prompt, entrypoint, container, requirements, and Foundry metadata.
 - `agents/municipal-incident-routing/` owns the Routing Agent prompt, entrypoint, container, requirements, and Foundry metadata.
 - `agents/municipal-incident-notification/` owns the Notification Agent prompt, entrypoint, container, requirements, and Foundry metadata.

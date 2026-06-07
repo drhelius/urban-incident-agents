@@ -35,11 +35,11 @@ services:
                     cpu: "0.5"
                     memory: 1Gi
     municipal-incident-orchestrator:
-        project: ./agents/orchestrator
+        project: ./agents/municipal-incident-orchestrator
         host: azure.ai.agent
         language: python
         docker:
-            path: Dockerfile.hosted
+            path: Dockerfile
             context: ../..
             platform: amd64
         config:

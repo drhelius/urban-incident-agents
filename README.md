@@ -5,7 +5,7 @@ Municipal incident triage app with a Streamlit frontend, FastAPI API, Microsoft 
 ## 1. Install Local Dependencies
 
 ```bash
-cp agents/orchestrator/env.example .env
+cp .env.example .env
 az login
 python3 -m venv .venv
 source .venv/bin/activate
@@ -38,7 +38,7 @@ Terminal 1:
 
 ```bash
 ORCHESTRATION_BACKEND=local \
-uvicorn orchestrator.api:app --reload --host 0.0.0.0 --port 8000
+uvicorn app:app --app-dir api --reload --host 0.0.0.0 --port 8000
 ```
 
 Terminal 2:
@@ -206,7 +206,7 @@ az acr build \
   --image urban-incidents-api:$IMAGE_TAG \
   --platform linux/amd64 \
   --source-acr-auth-id "[caller]" \
-  --file agents/orchestrator/Dockerfile \
+  --file api/Dockerfile \
   .
 
 az acr build \
@@ -295,7 +295,7 @@ az role assignment create \
 ## 16. Deploy ACA API
 
 ```bash
-cp agents/orchestrator/containerapp.yaml /tmp/containerapp-api.yaml
+cp api/containerapp.yaml /tmp/containerapp-api.yaml
 
 sed -i "s/{acr-name}/$ACR_NAME/g" /tmp/containerapp-api.yaml
 sed -i "s/{image-tag}/$IMAGE_TAG/g" /tmp/containerapp-api.yaml

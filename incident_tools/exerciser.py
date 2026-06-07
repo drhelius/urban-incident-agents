@@ -13,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from orchestrator.config import get_settings, load_dotenv_if_available
+from incident_core.config import get_settings, load_dotenv_if_available
 
 DEFAULT_ORCHESTRATOR_AGENT = "municipal-incident-orchestrator"
 

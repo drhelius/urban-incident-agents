@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from functools import lru_cache
 from typing import Any, Iterator
 
-from orchestrator.config import load_dotenv_if_available
+from incident_core.config import load_dotenv_if_available
 
 logger = logging.getLogger(__name__)
 

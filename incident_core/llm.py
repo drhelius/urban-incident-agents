@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from orchestrator.config import Settings
+from incident_core.config import Settings
 
 
 def build_foundry_agent(name: str, instructions: str, settings: Settings) -> Any:

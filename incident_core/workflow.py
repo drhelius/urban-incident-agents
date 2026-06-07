@@ -14,7 +14,7 @@ from agent_framework import (
 )
 from agent_framework.observability import AgentTelemetryLayer
 
-from orchestrator.agent_prompts import (
+from incident_core.prompts import (
     build_intake_prompt,
     build_notification_prompt,
     build_routing_prompt,
@@ -22,17 +22,17 @@ from orchestrator.agent_prompts import (
     notification_agent_instructions,
     routing_agent_instructions,
 )
-from orchestrator.config import Settings, get_settings
-from orchestrator.hosted_client import HostedAgentResponsesClient
-from orchestrator.json_utils import dumps_compact, extract_json_object
-from orchestrator.llm import agent_result_text, build_foundry_chat_client
-from orchestrator.models import (
+from incident_core.config import Settings, get_settings
+from incident_core.hosted_client import HostedAgentResponsesClient
+from incident_core.json_utils import dumps_compact, extract_json_object
+from incident_core.llm import agent_result_text, build_foundry_chat_client
+from incident_core.models import (
     IncidentWorkflowResult,
     IntakeResult,
     NotificationResult,
     RoutingResult,
 )
-from orchestrator.observability import configure_observability, mark_agent_created
+from incident_core.observability import configure_observability, mark_agent_created
 
 
 ORCHESTRATOR_AGENT_ID = "municipal-incident-orchestrator"

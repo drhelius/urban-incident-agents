@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import streamlit as st
 
-from orchestrator.observability import configure_observability, inject_trace_context, trace_span
+from incident_core.observability import configure_observability, inject_trace_context, trace_span
 
 API_URL = os.getenv("INCIDENT_API_URL", "http://localhost:8000").rstrip("/")
 configure_observability()

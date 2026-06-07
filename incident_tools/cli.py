@@ -6,8 +6,8 @@ import json
 import os
 from dataclasses import replace
 
-from orchestrator.config import get_settings
-from orchestrator.service import process_incident_report
+from incident_core.config import get_settings
+from incident_core.service import process_incident_report
 
 
 def main() -> None:

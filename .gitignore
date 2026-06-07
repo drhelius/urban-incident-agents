@@ -1,3 +1,6 @@
+# Local Azure environment script (contains deployment-specific values; never commit)
+/setenv.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

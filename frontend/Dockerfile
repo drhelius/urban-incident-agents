@@ -8,7 +8,7 @@ ENV PIP_RETRIES=20
 
 COPY pyproject.toml README.md ./
 COPY frontend ./frontend
-COPY agents ./agents
+COPY incident_core ./incident_core
 
 RUN pip install --no-cache-dir --retries 20 --timeout 300 ".[frontend,observability]"
 

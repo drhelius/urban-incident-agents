@@ -7,10 +7,10 @@ from uuid import uuid4
 import httpx
 from agent_framework import AgentSession
 
-from orchestrator.config import Settings, get_settings, load_dotenv_if_available
-from orchestrator.json_utils import extract_json_object
-from orchestrator.models import IncidentWorkflowResult
-from orchestrator.observability import inject_trace_context, trace_span
+from incident_core.config import Settings, get_settings, load_dotenv_if_available
+from incident_core.json_utils import extract_json_object
+from incident_core.models import IncidentWorkflowResult
+from incident_core.observability import inject_trace_context, trace_span
 
 
 class HostedAgentResponsesClient:

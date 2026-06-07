@@ -1,4 +1,4 @@
-from orchestrator.hosting import run_hosted_agent
+from incident_core.hosting import run_hosted_agent
 from prompt import ROUTING_AGENT_INSTRUCTIONS
 
 

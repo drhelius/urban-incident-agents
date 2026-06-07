@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from orchestrator.config import Settings, get_settings
-from orchestrator.hosted_client import run_hosted_workflow, run_local_responses_workflow
-from orchestrator.models import IncidentWorkflowResult
-from orchestrator.observability import record_incident_metrics
-from orchestrator.workflow import run_local_workflow
+from incident_core.config import Settings, get_settings
+from incident_core.hosted_client import run_hosted_workflow, run_local_responses_workflow
+from incident_core.models import IncidentWorkflowResult
+from incident_core.observability import record_incident_metrics
+from incident_core.workflow import run_local_workflow
 
 
 async def process_incident_report(
