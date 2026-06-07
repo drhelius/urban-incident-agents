@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from orchestrator.config import get_settings
-from orchestrator.observability import configure_observability, trace_span
+from orchestrator.observability import (
+    configure_observability,
+    extract_trace_context,
+    trace_span,
+)
 from orchestrator.service import process_incident_report
 
 configure_observability()
@@ -37,13 +41,15 @@ async def health() -> dict[str, Any]:
 
 
 @app.post("/api/incidents", response_model=IncidentResponse)
-async def triage_incident(request: IncidentRequest) -> dict[str, Any]:
+async def triage_incident(request: IncidentRequest, http_request: Request) -> dict[str, Any]:
+    parent_context = extract_trace_context(http_request.headers)
     with trace_span(
         "api.triage_incident",
         {
             "urban_incident.component": "orchestrator-api",
             "urban_incident.report.length": len(request.report),
         },
+        context=parent_context,
     ):
         try:
             result = await process_incident_report(request.report)
@@ -55,5 +61,5 @@ async def triage_incident(request: IncidentRequest) -> dict[str, Any]:
 
 
 @app.post("/triage", response_model=IncidentResponse)
-async def triage_alias(request: IncidentRequest) -> dict[str, Any]:
-    return await triage_incident(request)
+async def triage_alias(request: IncidentRequest, http_request: Request) -> dict[str, Any]:
+    return await triage_incident(request, http_request)

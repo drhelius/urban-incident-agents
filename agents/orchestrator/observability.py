@@ -55,14 +55,20 @@ def mark_agent_created(agent_id: str, agent_name: str) -> None:
 
 
 @contextmanager
-def trace_span(name: str, attributes: dict[str, Any] | None = None) -> Iterator[None]:
+def trace_span(
+    name: str,
+    attributes: dict[str, Any] | None = None,
+    context: Any | None = None,
+) -> Iterator[None]:
     try:
         from opentelemetry import trace
     except Exception:
         yield
         return
 
-    with trace.get_tracer("urban-incident-agents").start_as_current_span(name) as span:
+    with trace.get_tracer("urban-incident-agents").start_as_current_span(
+        name, context=context
+    ) as span:
         for key, value in (attributes or {}).items():
             span.set_attribute(key, value)
         yield
@@ -77,6 +83,21 @@ def inject_trace_context(headers: dict[str, str] | None = None) -> dict[str, str
     except Exception:
         return carrier
     return carrier
+
+
+def extract_trace_context(headers: Any | None = None) -> Any | None:
+    """Build an OpenTelemetry context from incoming W3C trace headers.
+
+    Returns ``None`` when no headers are supplied or propagation is unavailable,
+    in which case callers fall back to the current (local) context.
+    """
+    if not headers:
+        return None
+    try:
+        from opentelemetry.propagate import extract
+    except Exception:
+        return None
+    return extract(dict(headers))
 
 
 def _record_content() -> bool:

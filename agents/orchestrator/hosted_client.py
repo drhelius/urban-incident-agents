@@ -43,6 +43,12 @@ class HostedAgentResponsesClient:
                 "and azure-identity. Install dependencies with: pip install -e ."
             ) from exc
 
+        # Forward the active W3C trace context so the hosted agent (and the
+        # workers it calls) continue the caller's trace instead of starting a
+        # new one. The headers are applied to the OpenAI Responses call the
+        # FoundryAgent makes under the hood.
+        trace_headers = inject_trace_context()
+
         credential = DefaultAzureCredential()
         async with (
             AIProjectClient(
@@ -55,6 +61,7 @@ class HostedAgentResponsesClient:
                 agent_name=agent_name,
                 agent_version=agent_version,
                 allow_preview=True,
+                default_headers=trace_headers or None,
                 default_options={"store": False},
             ) as agent,
         ):
