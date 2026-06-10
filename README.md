@@ -630,3 +630,239 @@ urban-incidents-exerciser \
   --min-seconds 2 \
   --max-seconds 10
 ```
+
+## 20. Optional ACS WhatsApp Inbound Channel
+
+This optional integration lets a WhatsApp user send an incident report through
+an Azure Communication Services Advanced Messaging channel. ACS emits Event Grid
+events, an Azure Function maps each inbound message into the existing
+`/api/incidents` API, and the Function sends the final citizen-facing response
+back through ACS.
+
+This guide assumes the ACS-side WhatsApp channel is already connected. It only
+covers the application resources and Event Grid wiring needed by this repo.
+
+Official docs used by this path:
+
+- [Advanced Messaging for WhatsApp overview](https://learn.microsoft.com/en-us/azure/communication-services/concepts/advanced-messaging/whatsapp/whatsapp-overview)
+- [Advanced Messaging Event Grid events](https://learn.microsoft.com/en-us/azure/event-grid/communication-services-advanced-messaging-events)
+- [Azure Functions identity-based storage connections](https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference#connecting-to-host-storage-with-an-identity)
+- [Azure Queue trigger identity-based connections](https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-storage-queue-trigger?tabs=python-v2%2Cin-process%2Cextensionv5&pivots=programming-language-python#identity-based-connections)
+- [Python Advanced Messaging SDK](https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/advanced-messaging/whatsapp/get-started?tabs=visual-studio%2Cconnection-string&pivots=programming-language-python)
+
+### 20.1. Set Variables
+
+```bash
+ACS_NAME="<communication-services-resource-name>"
+ACS_RG="$APP_RG"
+WHATSAPP_FUNCTION_STORAGE="<globally-unique-storage-account-name>"
+WHATSAPP_FUNCTION_APP="<globally-unique-function-app-name>"
+WHATSAPP_FUNCTION_RELEASE_CONTAINER="whatsapp-function-releases"
+WHATSAPP_EVENT_SUBSCRIPTION_NAME="whatsapp-incidents-to-function"
+```
+
+### 20.2. Create The Function App Infrastructure
+
+This project uses Azure Functions Flex Consumption with identity-based host
+storage. Keep the deployment storage account reachable over public network
+access; Flex Consumption reads the deployed package from the configured blob
+container at runtime. Shared-key storage access can stay disabled.
+
+```bash
+az provider register --namespace Microsoft.Web --wait
+az provider register --namespace Microsoft.EventGrid --wait
+
+az storage account create \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_STORAGE" \
+  --location "$LOCATION" \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --min-tls-version TLS1_2 \
+  --allow-shared-key-access false \
+  --public-network-access Enabled
+
+az storage container create \
+  --account-name "$WHATSAPP_FUNCTION_STORAGE" \
+  --name "$WHATSAPP_FUNCTION_RELEASE_CONTAINER" \
+  --auth-mode login
+
+az functionapp create \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --storage-account "$WHATSAPP_FUNCTION_STORAGE" \
+  --flexconsumption-location "$LOCATION" \
+  --runtime python \
+  --runtime-version 3.12 \
+  --functions-version 4 \
+  --assign-identity \
+  --deployment-storage-auth-type SystemAssignedIdentity \
+  --deployment-storage-name "$WHATSAPP_FUNCTION_STORAGE" \
+  --deployment-storage-container-name "$WHATSAPP_FUNCTION_RELEASE_CONTAINER" \
+  --disable-app-insights true \
+  --instance-memory 2048 \
+  --maximum-instance-count 20
+```
+
+Grant the Function App identity access to host storage, queue triggers, the
+internal work queue, and the idempotency/delivery-status table.
+
+```bash
+WHATSAPP_FUNCTION_PRINCIPAL_ID=$(az functionapp identity show \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --query principalId -o tsv)
+
+WHATSAPP_FUNCTION_STORAGE_ID=$(az storage account show \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_STORAGE" \
+  --query id -o tsv)
+
+for ROLE in \
+  "Storage Blob Data Owner" \
+  "Storage Queue Data Contributor" \
+  "Storage Queue Data Reader" \
+  "Storage Queue Data Message Processor" \
+  "Storage Table Data Contributor"; do
+  az role assignment create \
+    --assignee "$WHATSAPP_FUNCTION_PRINCIPAL_ID" \
+    --role "$ROLE" \
+    --scope "$WHATSAPP_FUNCTION_STORAGE_ID"
+done
+
+az functionapp config appsettings set \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --settings \
+    AzureWebJobsStorage__accountName="$WHATSAPP_FUNCTION_STORAGE" \
+    AzureWebJobsStorage__credential=managedidentity \
+    AzureWebJobsStorage__blobServiceUri="https://${WHATSAPP_FUNCTION_STORAGE}.blob.core.windows.net" \
+    AzureWebJobsStorage__queueServiceUri="https://${WHATSAPP_FUNCTION_STORAGE}.queue.core.windows.net" \
+    AzureWebJobsStorage__tableServiceUri="https://${WHATSAPP_FUNCTION_STORAGE}.table.core.windows.net"
+
+az functionapp config appsettings delete \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --setting-names AzureWebJobsStorage
+```
+
+### 20.3. Configure Runtime Settings
+
+The Function calls the existing API and replies through ACS Advanced Messaging.
+Store the ACS connection string only in Azure app settings or Key Vault; never
+commit it.
+
+```bash
+API_FQDN=$(az containerapp show \
+  --name "$ACA_API_NAME" \
+  --resource-group "$APP_RG" \
+  --query properties.configuration.ingress.fqdn -o tsv)
+
+API_URL="https://$API_FQDN"
+
+ACS_ID=$(az resource show \
+  --resource-group "$ACS_RG" \
+  --name "$ACS_NAME" \
+  --resource-type Microsoft.Communication/CommunicationServices \
+  --query id -o tsv)
+
+ACS_CONNECTION_STRING=$(az rest \
+  --method post \
+  --url "https://management.azure.com${ACS_ID}/listKeys?api-version=2023-04-01" \
+  --query primaryConnectionString -o tsv)
+
+az functionapp config appsettings set \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --settings \
+    INCIDENT_API_URL="$API_URL" \
+    COMMUNICATION_SERVICES_CONNECTION_STRING="$ACS_CONNECTION_STRING" \
+    WHATSAPP_STORAGE_ACCOUNT_NAME="$WHATSAPP_FUNCTION_STORAGE" \
+    WHATSAPP_QUEUE_NAME="whatsapp-incidents" \
+    WHATSAPP_STATE_TABLE="whatsappincidentstate" \
+    APPLICATIONINSIGHTS_CONNECTION_STRING="$APPLICATIONINSIGHTS_CONNECTION_STRING"
+```
+
+The Function normally uses the inbound event's `data.to` value as the channel
+registration ID. If your channel requires an explicit value, add:
+
+```bash
+az functionapp config appsettings set \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --settings WHATSAPP_CHANNEL_REGISTRATION_ID="<channel-registration-id-guid>"
+```
+
+### 20.4. Deploy The Function Code
+
+The Function source is in `integrations/whatsapp-function/`. Because Flex
+Consumption rejects classic remote-build app settings, package Python
+dependencies locally into `.python_packages` and publish with `--no-build`.
+
+```bash
+cd integrations/whatsapp-function
+
+rm -rf .python_packages
+python3 -m pip install \
+  --target .python_packages/lib/site-packages \
+  -r requirements.txt
+
+func azure functionapp publish "$WHATSAPP_FUNCTION_APP" --python --no-build
+cd ../..
+```
+
+`host.json` sets Azure Queue trigger `messageEncoding` to `none`, because the
+Function enqueues plain JSON work items for the queue-triggered worker.
+
+### 20.5. Subscribe ACS Events To The Function Webhook
+
+Use the deployed HTTP Function endpoint as an Event Grid webhook. Treat the
+generated endpoint URL as a secret because it contains a Function key.
+
+```bash
+WHATSAPP_WEBHOOK_KEY=$(az functionapp function keys list \
+  --resource-group "$APP_RG" \
+  --name "$WHATSAPP_FUNCTION_APP" \
+  --function-name acs_whatsapp_events_webhook \
+  --query default -o tsv)
+
+WHATSAPP_WEBHOOK_URL="https://${WHATSAPP_FUNCTION_APP}.azurewebsites.net/api/acs-whatsapp-events?code=${WHATSAPP_WEBHOOK_KEY}"
+
+az eventgrid event-subscription create \
+  --name "$WHATSAPP_EVENT_SUBSCRIPTION_NAME" \
+  --source-resource-id "$ACS_ID" \
+  --endpoint-type webhook \
+  --endpoint "$WHATSAPP_WEBHOOK_URL" \
+  --included-event-types \
+    Microsoft.Communication.AdvancedMessageReceived \
+    Microsoft.Communication.AdvancedMessageDeliveryStatusUpdated \
+  --event-delivery-schema EventGridSchema
+```
+
+The HTTP webhook handles Event Grid subscription validation and then delegates to
+the same event normalization logic as the Event Grid trigger. This is the tested
+direct-delivery path for this Flex Consumption Function App.
+
+### 20.6. Test The WhatsApp Flow
+
+Send a municipal incident report to the connected WhatsApp number, for example:
+
+```text
+Large fallen tree blocking both lanes on Hillcrest Drive after the storm
+```
+
+Expected flow:
+
+```text
+WhatsApp -> ACS AdvancedMessageReceived -> Event Grid webhook -> Function
+-> /api/incidents -> hosted orchestrator -> Intake -> Routing -> Notification
+-> Function -> ACS Advanced Messaging text reply -> WhatsApp
+```
+
+The Function supports `text`, `button`, `interactive`, and media-caption events.
+For media without a caption, stickers, or reactions, it replies asking the user
+to send a short text description of the municipal incident.
+
+For outbound replies, the handler uses the inbound `from` phone-number value and
+normalizes digit-only values to E.164 format. `fromBSUID` is retained only as a
+fallback because ACS outbound sends require a phone-number-shaped recipient.

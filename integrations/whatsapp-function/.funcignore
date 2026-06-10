@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+local.settings.json
+.local.settings.json
+.env
+.envrc
+.pytest_cache/
+.ruff_cache/

@@ -1,6 +1,9 @@
 # Local Azure environment script (contains deployment-specific values; never commit)
 /setenv.sh
 
+# Azure Functions local/vendored packages
+integrations/whatsapp-function/.python_packages/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

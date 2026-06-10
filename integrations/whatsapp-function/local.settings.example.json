@@ -1,0 +1,11 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "INCIDENT_API_URL": "https://<api-container-app-fqdn>",
+    "COMMUNICATION_SERVICES_CONNECTION_STRING": "<communication-services-connection-string>",
+    "WHATSAPP_CHANNEL_REGISTRATION_ID": "<channel-registration-id-guid>",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "<app-insights-connection-string>"
+  }
+}
