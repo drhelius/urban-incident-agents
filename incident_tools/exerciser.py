@@ -90,6 +90,7 @@ class ExerciserConfig:
     max_seconds: float
     threads: int
     timeout_seconds: float
+    count: int | None
 
 
 class TokenProvider:
@@ -120,6 +121,12 @@ def main() -> None:
     settings = get_settings()
     parser = argparse.ArgumentParser(description="Continuously exercise a Foundry hosted orchestrator.")
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=None,
+        help="Total number of requests to send before exiting. Defaults to running until interrupted.",
+    )
     parser.add_argument("--min-seconds", type=float, default=5.0)
     parser.add_argument("--max-seconds", type=float, default=30.0)
     parser.add_argument(
@@ -139,16 +146,18 @@ def main() -> None:
         max_seconds=args.max_seconds,
         threads=args.threads,
         timeout_seconds=args.timeout_seconds,
+        count=args.count,
     )
     _validate_config(config)
 
     stop_event = threading.Event()
     output_lock = threading.Lock()
     token_provider = TokenProvider(config.token_scope)
+    remaining = _RemainingRequests(config.count)
     workers = [
         threading.Thread(
             target=_worker_loop,
-            args=(index + 1, config, token_provider, stop_event, output_lock),
+            args=(index + 1, config, token_provider, stop_event, output_lock, remaining),
             daemon=True,
         )
         for index in range(config.threads)
@@ -182,10 +191,15 @@ def _worker_loop(
     token_provider: TokenProvider,
     stop_event: threading.Event,
     output_lock: threading.Lock,
+    remaining: _RemainingRequests,
 ) -> None:
     random_source = random.Random(time.time_ns() + worker_id)
     endpoint = _responses_endpoint(config.project_endpoint, config.agent_name)
     while not stop_event.is_set():
+        if not remaining.claim():
+            stop_event.set()
+            return
+
         delay = random_source.uniform(config.min_seconds, config.max_seconds)
         if stop_event.wait(delay):
             return
@@ -271,6 +285,8 @@ def _responses_text(payload: dict[str, Any]) -> str:
 def _validate_config(config: ExerciserConfig) -> None:
     if config.threads < 1:
         raise ValueError("--threads must be at least 1")
+    if config.count is not None and config.count < 1:
+        raise ValueError("--count must be at least 1")
     if config.min_seconds < 0:
         raise ValueError("--min-seconds must be 0 or greater")
     if config.max_seconds < config.min_seconds:
@@ -292,6 +308,21 @@ def _shorten(value: str, limit: int = 220) -> str:
     if len(clean) <= limit:
         return clean
     return clean[: limit - 3] + "..."
+
+
+class _RemainingRequests:
+    def __init__(self, count: int | None):
+        self._remaining = count
+        self._lock = threading.Lock()
+
+    def claim(self) -> bool:
+        with self._lock:
+            if self._remaining is None:
+                return True
+            if self._remaining <= 0:
+                return False
+            self._remaining -= 1
+            return True
 
 
 if __name__ == "__main__":

@@ -635,11 +635,27 @@ curl -sS "$API_URL/health"
 
 ## 19. Run Remote Orchestrator Exerciser
 
+The exerciser calls the deployed Foundry orchestrator agent directly. It does
+not call the FastAPI bridge, so use `--project-endpoint` rather than an API URL.
+
 ```bash
 urban-incidents-exerciser \
+  --project-endpoint "$FOUNDRY_PROJECT_ENDPOINT" \
+  --agent-name "${ORCHESTRATOR_AGENT_NAME:-municipal-incident-orchestrator}" \
   --threads 4 \
   --min-seconds 2 \
   --max-seconds 10
+```
+
+For a short smoke test:
+
+```bash
+urban-incidents-exerciser \
+  --project-endpoint "$FOUNDRY_PROJECT_ENDPOINT" \
+  --agent-name "${ORCHESTRATOR_AGENT_NAME:-municipal-incident-orchestrator}" \
+  --count 3 \
+  --min-seconds 0 \
+  --max-seconds 1
 ```
 
 ## 20. Optional ACS WhatsApp Inbound Channel
