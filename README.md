@@ -174,7 +174,9 @@ This mode allows each agent to be invoked, scaled, tested, observed, and version
 
 ### Hosted Coordinator Agent
 
-The orchestrator is deployed as a Foundry Hosted Agent. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification hosted agents in sequence through Agent Framework workflow composition.
+The orchestrator is deployed as a Foundry Hosted Agent. In this mode, the complete workflow is exposed as a single Responses-compatible hosted coordinator. Internally, it calls the deployed Intake, Routing, and Notification agents in sequence through Agent Framework workflow composition.
+
+Set `CHILD_AGENT_MODE=framework` to call the hosted Microsoft Agent Framework child agents. Set `CHILD_AGENT_MODE=prompt` to call the Foundry prompt/declarative child agents with `-dcl` names. Use `CHILD_AGENT_MODE=custom` when you want to provide explicit child agent names.
 
 This is the hosted entrypoint used by the ACA frontend/API deployment path.
 
@@ -296,10 +298,19 @@ AZURE_AI_MODEL_DEPLOYMENT_NAME=gpt-5.4
 ORCHESTRATION_BACKEND=local
 APPLICATIONINSIGHTS_CONNECTION_STRING=<foundry-app-insights-connection-string>
 ORCHESTRATOR_AGENT_NAME=municipal-incident-orchestrator
+CHILD_AGENT_MODE=framework
 INTAKE_AGENT_NAME=municipal-incident-intake
 ROUTING_AGENT_NAME=municipal-incident-routing
 NOTIFICATION_AGENT_NAME=municipal-incident-notification
 ```
+
+`CHILD_AGENT_MODE` controls which deployed child agents the hosted orchestrator
+calls:
+
+- `framework`: use the hosted Microsoft Agent Framework child agents.
+- `prompt`: use the Foundry prompt/declarative child agents ending in `-dcl`.
+- `custom`: use `INTAKE_AGENT_NAME`, `ROUTING_AGENT_NAME`, and
+  `NOTIFICATION_AGENT_NAME` exactly as configured.
 
 ## 2. Run Local CLI
 

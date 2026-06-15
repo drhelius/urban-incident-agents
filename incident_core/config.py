@@ -8,6 +8,16 @@ DEFAULT_PROJECT_ENDPOINT = (
     "https://<YOUR-RESOURCE>.services.ai.azure.com/api/projects/<YOUR-PROJECT>"
 )
 DEFAULT_MODEL_DEPLOYMENT = "gpt-5.4"
+FRAMEWORK_CHILD_AGENTS = {
+    "intake": "municipal-incident-intake",
+    "routing": "municipal-incident-routing",
+    "notification": "municipal-incident-notification",
+}
+PROMPT_CHILD_AGENTS = {
+    "intake": "municipal-incident-intake-dcl",
+    "routing": "municipal-incident-routing-dcl",
+    "notification": "municipal-incident-notification-dcl",
+}
 
 
 def load_dotenv_if_available() -> None:
@@ -23,10 +33,11 @@ class Settings:
     foundry_project_endpoint: str = DEFAULT_PROJECT_ENDPOINT
     model_deployment_name: str = DEFAULT_MODEL_DEPLOYMENT
     orchestration_backend: str = "local"
+    child_agent_mode: str = "framework"
     orchestrator_agent_name: str = "municipal-incident-orchestrator"
-    intake_agent_name: str = "municipal-incident-intake"
-    routing_agent_name: str = "municipal-incident-routing"
-    notification_agent_name: str = "municipal-incident-notification"
+    intake_agent_name: str = FRAMEWORK_CHILD_AGENTS["intake"]
+    routing_agent_name: str = FRAMEWORK_CHILD_AGENTS["routing"]
+    notification_agent_name: str = FRAMEWORK_CHILD_AGENTS["notification"]
     orchestrator_agent_version: str | None = None
     intake_agent_version: str | None = None
     routing_agent_version: str | None = None
@@ -38,6 +49,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         load_dotenv_if_available()
+        child_agent_mode = _child_agent_mode(os.getenv("CHILD_AGENT_MODE", "framework"))
         return cls(
             foundry_project_endpoint=os.getenv(
                 "FOUNDRY_PROJECT_ENDPOINT", DEFAULT_PROJECT_ENDPOINT
@@ -46,13 +58,24 @@ class Settings:
                 "AZURE_AI_MODEL_DEPLOYMENT_NAME", DEFAULT_MODEL_DEPLOYMENT
             ),
             orchestration_backend=os.getenv("ORCHESTRATION_BACKEND", "local").strip().lower(),
+            child_agent_mode=child_agent_mode,
             orchestrator_agent_name=os.getenv(
                 "ORCHESTRATOR_AGENT_NAME", "municipal-incident-orchestrator"
             ),
-            intake_agent_name=os.getenv("INTAKE_AGENT_NAME", "municipal-incident-intake"),
-            routing_agent_name=os.getenv("ROUTING_AGENT_NAME", "municipal-incident-routing"),
-            notification_agent_name=os.getenv(
-                "NOTIFICATION_AGENT_NAME", "municipal-incident-notification"
+            intake_agent_name=_child_agent_name(
+                child_agent_mode,
+                "INTAKE_AGENT_NAME",
+                "intake",
+            ),
+            routing_agent_name=_child_agent_name(
+                child_agent_mode,
+                "ROUTING_AGENT_NAME",
+                "routing",
+            ),
+            notification_agent_name=_child_agent_name(
+                child_agent_mode,
+                "NOTIFICATION_AGENT_NAME",
+                "notification",
             ),
             orchestrator_agent_version=_optional_env("ORCHESTRATOR_AGENT_VERSION"),
             intake_agent_version=_optional_env("INTAKE_AGENT_VERSION"),
@@ -86,6 +109,7 @@ class Settings:
             "foundry_project_endpoint": self.foundry_project_endpoint,
             "model_deployment_name": self.model_deployment_name,
             "orchestration_backend": self.orchestration_backend,
+            "child_agent_mode": self.child_agent_mode,
             "orchestrator_agent_name": self.orchestrator_agent_name,
             "orchestrator_agent_version": self.orchestrator_agent_version,
             "intake_agent_name": self.intake_agent_name,
@@ -109,3 +133,24 @@ def _optional_env(name: str) -> str | None:
     if value is None or not value.strip():
         return None
     return value.strip()
+
+
+def _child_agent_mode(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in {"framework", "agent_framework", "maf", "hosted"}:
+        return "framework"
+    if normalized in {"prompt", "declarative", "dcl"}:
+        return "prompt"
+    if normalized == "custom":
+        return "custom"
+    raise ValueError(
+        "CHILD_AGENT_MODE must be one of: framework, prompt, declarative, dcl, custom."
+    )
+
+
+def _child_agent_name(mode: str, env_name: str, key: str) -> str:
+    if mode == "framework":
+        return FRAMEWORK_CHILD_AGENTS[key]
+    if mode == "prompt":
+        return PROMPT_CHILD_AGENTS[key]
+    return os.getenv(env_name, FRAMEWORK_CHILD_AGENTS[key])

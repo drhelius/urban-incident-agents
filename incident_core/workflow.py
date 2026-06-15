@@ -100,14 +100,21 @@ class RemoteHostedAgentExecutor(Executor):
         client: HostedAgentResponsesClient,
         agent_name: str,
         agent_version: str | None = None,
+        invocation_mode: str = "framework",
     ) -> None:
         super().__init__(id=id)
         self.client = client
         self.agent_name = agent_name
         self.agent_version = agent_version
+        self.invocation_mode = invocation_mode
 
     async def _run_agent(self, prompt: str) -> str:
-        return await self.client.run(self.agent_name, prompt, self.agent_version)
+        return await self.client.run(
+            self.agent_name,
+            prompt,
+            self.agent_version,
+            invocation_mode=self.invocation_mode,
+        )
 
 
 class RemoteIntakeAgentExecutor(RemoteHostedAgentExecutor):
@@ -229,6 +236,7 @@ def build_remote_orchestrator_agent(settings: Settings | None = None):
 
     names = active_settings.hosted_agent_names
     versions = active_settings.hosted_agent_versions
+    invocation_mode = "prompt" if active_settings.child_agent_mode == "prompt" else "framework"
     hosted_client = HostedAgentResponsesClient(active_settings)
 
     mark_agent_created(names["intake"], "Intake Agent")
@@ -242,18 +250,21 @@ def build_remote_orchestrator_agent(settings: Settings | None = None):
         client=hosted_client,
         agent_name=names["intake"],
         agent_version=versions["intake"],
+        invocation_mode=invocation_mode,
     )
     routing_executor = RemoteRoutingAgentExecutor(
         id="call-municipal-incident-routing",
         client=hosted_client,
         agent_name=names["routing"],
         agent_version=versions["routing"],
+        invocation_mode=invocation_mode,
     )
     notification_executor = RemoteNotificationAgentExecutor(
         id="call-municipal-incident-notification",
         client=hosted_client,
         agent_name=names["notification"],
         agent_version=versions["notification"],
+        invocation_mode=invocation_mode,
     )
 
     workflow = (

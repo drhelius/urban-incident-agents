@@ -19,15 +19,52 @@ class HostedAgentResponsesClient:
         self.settings = settings
         self._credential = None
 
-    async def run(self, agent_name: str, prompt: str, agent_version: str | None = None) -> str:
+    async def run(
+        self,
+        agent_name: str,
+        prompt: str,
+        agent_version: str | None = None,
+        invocation_mode: str = "framework",
+    ) -> str:
         with trace_span(
             "orchestrator.call_hosted_agent",
             {
                 "gen_ai.agent.name": agent_name,
                 "gen_ai.agent.version": agent_version or "latest",
+                "gen_ai.agent.invocation_mode": invocation_mode,
             },
         ):
+            if invocation_mode == "prompt":
+                return await self._run_prompt_agent(agent_name, prompt)
             return await self._run_foundry_agent(agent_name, prompt, agent_version)
+
+    async def _run_prompt_agent(self, agent_name: str, prompt: str) -> str:
+        try:
+            from azure.identity.aio import DefaultAzureCredential
+        except ImportError as exc:
+            raise RuntimeError(
+                "Prompt-agent orchestration requires azure-identity. "
+                "Install dependencies with: pip install -e ."
+            ) from exc
+
+        trace_headers = inject_trace_context()
+        payload = {"input": prompt, "stream": False}
+        endpoint = _responses_endpoint(self.settings.foundry_project_endpoint, agent_name)
+        async with DefaultAzureCredential() as credential:
+            token = await credential.get_token(self.settings.foundry_token_scope)
+
+        headers = {
+            "Authorization": f"Bearer {token.token}",
+            "Content-Type": "application/json",
+        }
+        if trace_headers:
+            headers.update(trace_headers)
+
+        timeout = httpx.Timeout(self.settings.request_timeout_seconds)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(endpoint, headers=headers, json=payload)
+            response.raise_for_status()
+            return _responses_text(response.json())
 
     async def _run_foundry_agent(
         self, agent_name: str, prompt: str, agent_version: str | None

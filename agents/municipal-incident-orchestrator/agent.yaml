@@ -18,6 +18,8 @@ environment_variables:
     value: always_on
   - name: ENABLE_SENSITIVE_DATA
     value: "true"
+  - name: CHILD_AGENT_MODE
+    value: ${CHILD_AGENT_MODE}
   - name: INTAKE_AGENT_NAME
     value: municipal-incident-intake
   - name: ROUTING_AGENT_NAME
