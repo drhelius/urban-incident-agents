@@ -636,18 +636,17 @@ curl -sS "$API_URL/health"
 ## 19. Run Remote Orchestrator Exerciser
 
 The exerciser calls the deployed Foundry orchestrator agent directly. It does
-not call the FastAPI bridge, so use `--project-endpoint` rather than an API URL.
+not call the FastAPI bridge or Container Apps API, so use `--project-endpoint`
+rather than an API URL.
+
+Prepare the shell from the repository root:
 
 ```bash
-urban-incidents-exerciser \
-  --project-endpoint "$FOUNDRY_PROJECT_ENDPOINT" \
-  --agent-name "${ORCHESTRATOR_AGENT_NAME:-municipal-incident-orchestrator}" \
-  --threads 4 \
-  --min-seconds 2 \
-  --max-seconds 10
+source .venv/bin/activate
+source ./setenv.sh
 ```
 
-For a short smoke test:
+Run a short finite smoke test:
 
 ```bash
 urban-incidents-exerciser \
@@ -655,8 +654,30 @@ urban-incidents-exerciser \
   --agent-name "${ORCHESTRATOR_AGENT_NAME:-municipal-incident-orchestrator}" \
   --count 3 \
   --min-seconds 0 \
-  --max-seconds 1
+  --max-seconds 1 \
+  --timeout-seconds 240
 ```
+
+Run a continuous exercise session until interrupted with `Ctrl+C`:
+
+```bash
+urban-incidents-exerciser \
+  --project-endpoint "$FOUNDRY_PROJECT_ENDPOINT" \
+  --agent-name "${ORCHESTRATOR_AGENT_NAME:-municipal-incident-orchestrator}" \
+  --threads 4 \
+  --min-seconds 2 \
+  --max-seconds 10 \
+  --timeout-seconds 240
+```
+
+Useful flags:
+
+- `--count`: total requests to send before exiting. Omit it to run until interrupted.
+- `--threads`: concurrent worker threads.
+- `--min-seconds` / `--max-seconds`: randomized delay between requests per worker.
+- `--timeout-seconds`: per-request timeout for the Foundry Responses call.
+
+Do not pass `--api-url`; that flag is not supported by the exerciser.
 
 ## 20. Optional ACS WhatsApp Inbound Channel
 
